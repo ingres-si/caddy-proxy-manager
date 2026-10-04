@@ -7,7 +7,7 @@
 import http from 'node:http';
 import net from 'node:net';
 import crypto from 'node:crypto';
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 export interface HttpResponse {
   status: number;
@@ -217,4 +217,18 @@ export async function injectFormFields(page: Page, fields: Record<string, string
       }
     }
   }, fields);
+}
+
+/**
+ * Set the "Force SSL" switch in the open host dialog. The switch defaults to
+ * ON, so tests that need plain-HTTP routing must turn it off before submitting.
+ */
+export async function setForceSsl(page: Page, enabled: boolean): Promise<void> {
+  const toggle = page
+    .getByRole('dialog')
+    .locator('div:has(> input[name="sslForcedPresent"])')
+    .getByRole('switch');
+  const state = enabled ? 'checked' : 'unchecked';
+  if ((await toggle.getAttribute('data-state')) !== state) await toggle.click();
+  await expect(toggle).toHaveAttribute('data-state', state);
 }

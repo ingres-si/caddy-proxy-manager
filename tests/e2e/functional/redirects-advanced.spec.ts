@@ -13,7 +13,7 @@
  * Domain: func-redirects-adv.test
  */
 import { test, expect } from '@playwright/test';
-import { httpGet, injectFormFields, waitForRoute } from '../../helpers/http';
+import { httpGet, injectFormFields, waitForRoute, setForceSsl } from '../../helpers/http';
 
 const DOMAIN = 'func-redirects-adv.test';
 
@@ -41,8 +41,9 @@ test.describe.serial('Redirect Rules – full URLs, cross-domain, wildcards', ()
     await page.getByLabel(/domains/i).fill(DOMAIN);
     await page.getByPlaceholder('10.0.0.5:8080').first().fill('echo-server:8080');
 
+    // Force SSL defaults to ON; these tests exercise plain-HTTP routing.
+    await setForceSsl(page, false);
     await injectFormFields(page, {
-      sslForcedPresent: 'on',
       redirectsJson: JSON.stringify([
         // ── full absolute URL destinations ──────────────────────────────────
         // Exact path → full URL on a completely different host (301)

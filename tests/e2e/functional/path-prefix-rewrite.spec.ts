@@ -9,7 +9,7 @@
  * Domain: func-rewrite.test
  */
 import { test, expect } from '@playwright/test';
-import { httpGet, injectFormFields, waitForRoute } from '../../helpers/http';
+import { httpGet, waitForRoute, setForceSsl } from '../../helpers/http';
 
 const DOMAIN = 'func-rewrite.test';
 
@@ -27,7 +27,8 @@ test.describe.serial('Path Prefix Rewrite', () => {
     // Fill in the path prefix rewrite field
     await page.getByLabel('Path Prefix Rewrite').fill('/api');
 
-    await injectFormFields(page, { sslForcedPresent: 'on' });
+    // Force SSL defaults to ON; these tests exercise plain-HTTP routing.
+    await setForceSsl(page, false);
     await page.getByRole('button', { name: /^create$/i }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('table').getByText('Functional Path Prefix Rewrite Test')).toBeVisible({ timeout: 10_000 });

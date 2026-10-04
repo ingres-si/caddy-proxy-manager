@@ -21,7 +21,7 @@
  * Domain: func-path-rules.test
  */
 import { test, expect } from '@playwright/test';
-import { httpGet, injectFormFields, waitForRoute } from '../../helpers/http';
+import { httpGet, injectFormFields, waitForRoute, setForceSsl } from '../../helpers/http';
 
 const DOMAIN = 'func-path-rules.test';
 
@@ -37,8 +37,9 @@ test.describe.serial('Path Blocks and Path Rewrites', () => {
     // rewritten URI is what the upstream received.
     await page.getByPlaceholder('10.0.0.5:8080').first().fill('whoami-server:80');
 
+    // Force SSL defaults to ON; these tests exercise plain-HTTP routing.
+    await setForceSsl(page, false);
     await injectFormFields(page, {
-      sslForcedPresent: 'on',
       pathBlocksJson: JSON.stringify([
         { path: '/dns-query', status: 403, body: 'Forbidden' },
         { path: '/admin/*',   status: 404 },
@@ -115,8 +116,9 @@ test.describe.serial('Path Allows override Path Blocks', () => {
     await page.getByLabel(/domains/i).fill(ALLOW_DOMAIN);
     await page.getByPlaceholder('10.0.0.5:8080').first().fill('whoami-server:80');
 
+    // Force SSL defaults to ON; these tests exercise plain-HTTP routing.
+    await setForceSsl(page, false);
     await injectFormFields(page, {
-      sslForcedPresent: 'on',
       pathAllowsJson: JSON.stringify([
         { path: '/secret' },
         { path: '/public/*' },

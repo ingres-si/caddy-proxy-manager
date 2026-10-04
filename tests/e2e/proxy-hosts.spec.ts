@@ -538,4 +538,98 @@ test.describe('Proxy Hosts', () => {
       await page.request.delete(`${API_PROXY_HOSTS}/${withoutHost.id}`, { headers: { Origin: origin } });
     }
   });
+
+  /**
+   * Force SSL (sslForced) had no UI control. Editing could not change it, and
+   * duplicating a host with Force SSL off silently produced a copy with it on,
+   * causing HTTP→HTTPS redirect loops behind TLS-terminating tunnels.
+   */
+  test('Force SSL toggle is saved on edit', async ({ page }) => {
+    const origin = new URL(page.url()).origin;
+    const createResp = await page.request.post(API_PROXY_HOSTS, {
+      headers: { Origin: origin },
+      data: {
+        name: 'Force SSL Edit Host',
+        domains: ['force-ssl-edit.local'],
+        upstreams: ['localhost:9986'],
+        sslForced: true,
+      },
+    });
+    expect(createResp.ok()).toBeTruthy();
+    const created = await createResp.json() as { id: number };
+    const openEdit = async () => {
+      await page.goto('/proxy-hosts');
+      const row = page.locator('tr', { hasText: 'Force SSL Edit Host' });
+      await expect(row).toBeVisible({ timeout: 10_000 });
+      await row.getByRole('button', { name: /open menu/i }).click();
+      await page.getByRole('menuitem', { name: 'Edit' }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      return page.getByRole('dialog').locator('div:has(> input[name="sslForcedPresent"])').getByRole('switch');
+    };
+
+    try {
+      const sslSwitch = await openEdit();
+      await expect(sslSwitch).toHaveAttribute('data-state', 'checked');
+      await sslSwitch.click();
+      await expect(sslSwitch).toHaveAttribute('data-state', 'unchecked');
+      await page.getByRole('dialog').getByRole('button', { name: /save changes/i }).click();
+      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
+
+      const afterOff = await (await page.request.get(`${API_PROXY_HOSTS}/${created.id}`)).json() as { sslForced: boolean };
+      expect(afterOff.sslForced).toBe(false);
+
+      // Re-open: UI reflects the saved value, then turn it back on.
+      const sslSwitch2 = await openEdit();
+      await expect(sslSwitch2).toHaveAttribute('data-state', 'unchecked');
+      await sslSwitch2.click();
+      await page.getByRole('dialog').getByRole('button', { name: /save changes/i }).click();
+      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
+
+      const afterOn = await (await page.request.get(`${API_PROXY_HOSTS}/${created.id}`)).json() as { sslForced: boolean };
+      expect(afterOn.sslForced).toBe(true);
+    } finally {
+      await page.request.delete(`${API_PROXY_HOSTS}/${created.id}`, { headers: { Origin: origin } });
+    }
+  });
+
+  test('duplicating a host preserves Force SSL = off', async ({ page }) => {
+    const origin = new URL(page.url()).origin;
+    const createResp = await page.request.post(API_PROXY_HOSTS, {
+      headers: { Origin: origin },
+      data: {
+        name: 'Force SSL Dup Source',
+        domains: ['force-ssl-dup-source.local'],
+        upstreams: ['localhost:9985'],
+        sslForced: false,
+      },
+    });
+    expect(createResp.ok()).toBeTruthy();
+    const source = await createResp.json() as { id: number };
+
+    try {
+      await page.goto('/proxy-hosts');
+      const row = page.locator('tr', { hasText: 'Force SSL Dup Source' });
+      await expect(row).toBeVisible({ timeout: 10_000 });
+      await row.getByRole('button', { name: /open menu/i }).click();
+      await page.getByRole('menuitem', { name: 'Duplicate' }).click();
+
+      const dialog = page.getByRole('dialog');
+      await expect(dialog).toBeVisible();
+      const sslSwitch = dialog.locator('div:has(> input[name="sslForcedPresent"])').getByRole('switch');
+      await expect(sslSwitch).toHaveAttribute('data-state', 'unchecked');
+
+      await dialog.getByLabel('Name').fill('Force SSL Dup Copy');
+      await dialog.getByLabel(/domains/i).fill('force-ssl-dup-copy.local');
+      await dialog.getByRole('button', { name: /^create$/i }).click();
+      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
+
+      const hosts = await (await page.request.get(API_PROXY_HOSTS)).json() as Array<{ id: number; name: string; sslForced: boolean }>;
+      const copy = hosts.find((h) => h.name === 'Force SSL Dup Copy');
+      expect(copy).toBeDefined();
+      expect(copy!.sslForced).toBe(false);
+      await page.request.delete(`${API_PROXY_HOSTS}/${copy!.id}`, { headers: { Origin: origin } });
+    } finally {
+      await page.request.delete(`${API_PROXY_HOSTS}/${source.id}`, { headers: { Origin: origin } });
+    }
+  });
 });

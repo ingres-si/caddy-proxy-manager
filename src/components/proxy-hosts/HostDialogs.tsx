@@ -93,6 +93,7 @@ export function CreateHostDialog({
                     </Alert>
                 )}
                 <SettingsToggles
+                    sslForced={initialData?.sslForced}
                     hstsSubdomains={initialData?.hstsSubdomains}
                     skipHttpsValidation={initialData?.skipHttpsHostnameValidation}
                     enabled={true}
@@ -262,6 +263,7 @@ export function EditHostDialog({
                     </Alert>
                 )}
                 <SettingsToggles
+                    sslForced={host.sslForced}
                     hstsSubdomains={host.hstsSubdomains}
                     skipHttpsValidation={host.skipHttpsHostnameValidation}
                     enabled={host.enabled}

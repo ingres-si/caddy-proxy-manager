@@ -758,6 +758,7 @@ export async function updateProxyHostAction(
         accessListId: formData.has("accessListId")
           ? parseAccessListId(formData.get("accessListId"))
           : undefined,
+        sslForced: boolField("sslForced"),
         hstsSubdomains: boolField("hstsSubdomains"),
         skipHttpsHostnameValidation: boolField("skipHttpsHostnameValidation"),
         enabled: boolField("enabled"),

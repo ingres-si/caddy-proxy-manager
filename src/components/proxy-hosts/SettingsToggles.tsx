@@ -3,24 +3,27 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 
 type ToggleSetting = {
-    stateKey: "hstsSubdomains" | "skipHttpsHostnameValidation";
-    fieldName: "hstsSubdomains" | "skipHttpsHostnameValidation";
+    stateKey: "sslForced" | "hstsSubdomains" | "skipHttpsHostnameValidation";
+    fieldName: "sslForced" | "hstsSubdomains" | "skipHttpsHostnameValidation";
     label: string;
     description: string;
 };
 
 type SettingsTogglesProps = {
+    sslForced?: boolean;
     hstsSubdomains?: boolean;
     skipHttpsValidation?: boolean;
     enabled?: boolean;
 };
 
 export function SettingsToggles({
+    sslForced = true,
     hstsSubdomains = true,
     skipHttpsValidation = false,
     enabled = true
 }: SettingsTogglesProps) {
     const [values, setValues] = useState({
+        sslForced: sslForced,
         hstsSubdomains: hstsSubdomains,
         skipHttpsHostnameValidation: skipHttpsValidation,
         enabled: enabled
@@ -31,6 +34,12 @@ export function SettingsToggles({
     };
 
     const settings: ToggleSetting[] = [
+        {
+            stateKey: "sslForced",
+            fieldName: "sslForced",
+            label: "Force SSL",
+            description: "Redirect HTTP requests to HTTPS. Turn off when TLS is terminated upstream (e.g. Cloudflare Tunnel) to avoid redirect loops",
+        },
         {
             stateKey: "hstsSubdomains",
             fieldName: "hstsSubdomains",

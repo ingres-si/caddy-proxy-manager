@@ -12,7 +12,7 @@
  * Domain: func-redirects.test
  */
 import { test, expect } from '@playwright/test';
-import { httpGet, injectFormFields, waitForRoute } from '../../helpers/http';
+import { httpGet, injectFormFields, waitForRoute, setForceSsl } from '../../helpers/http';
 
 const DOMAIN = 'func-redirects.test';
 
@@ -30,8 +30,9 @@ test.describe.serial('Per-path Redirect Rules', () => {
     // redirects_json is a hidden input rendered by RedirectsFields whose value
     // reflects React state; setting .value just before submit works because no
     // React render cycle fires between the injection and form data collection.
+    // Force SSL defaults to ON; these tests exercise plain-HTTP routing.
+    await setForceSsl(page, false);
     await injectFormFields(page, {
-      sslForcedPresent: 'on',
       redirectsJson: JSON.stringify([
         { from: '/.well-known/carddav', to: '/remote.php/dav/', status: 301 },
         { from: '/.well-known/caldav',  to: '/remote.php/dav/', status: 302 },
