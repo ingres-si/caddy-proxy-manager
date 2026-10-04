@@ -113,7 +113,7 @@
     "drizzle-kit": "^0.31.11",
     "eslint": "^10.11.0",
     "ioredis-mock": "8.13.1",
-    "shadcn": "^4.21.0",
+    "shadcn": "^4.21.1",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript-eslint": "^8.71.0",
     "vite-tsconfig-paths": "^6.1.1",
