@@ -78,8 +78,8 @@ require (
 	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/corazawaf/coraza-coreruleset/v4 v4.25.0 // indirect
-	github.com/corazawaf/coraza/v3 v3.7.0 // indirect
-	github.com/corazawaf/libinjection-go v0.3.2 // indirect
+	github.com/corazawaf/coraza/v3 v3.8.1 // indirect
+	github.com/corazawaf/libinjection-go v0.3.3 // indirect
 	github.com/coreos/go-oidc/v3 v3.17.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/dgraph-io/badger v1.6.2 // indirect
@@ -98,7 +98,7 @@ require (
 	github.com/go-resty/resty/v2 v2.16.5 // indirect
 	github.com/go-sql-driver/mysql v1.9.3 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
-	github.com/goccy/go-yaml v1.18.0 // indirect
+	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/cel-go v0.29.0 // indirect
