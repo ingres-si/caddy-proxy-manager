@@ -367,7 +367,7 @@ export async function loadFirstRun(access: Access): Promise<OverviewFirstRun | n
 // ── The page ─────────────────────────────────────────────────────────────
 
 function emptyAttention(now: Date): AttentionView {
-  return { generatedAt: now.toISOString(), items: [], truncated: false, counts: { critical: 0, warning: 0, info: 0 }, sources: [] };
+  return { generatedAt: now.toISOString(), items: [], truncated: false, counts: { critical: 0, warning: 0, info: 0 }, dismissed: 0, sources: [] };
 }
 
 export async function loadOverview(

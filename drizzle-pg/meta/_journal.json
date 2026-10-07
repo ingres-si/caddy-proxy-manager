@@ -71,6 +71,13 @@
       "when": 1791330000000,
       "tag": "0061_drop_license_and_usage_ping",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1791340000000,
+      "tag": "0062_attention_dismissals",
+      "breakpoints": true
     }
   ]
 }

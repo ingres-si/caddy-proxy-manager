@@ -12,6 +12,8 @@
  * reader may open it, otherwise to the analytics with the matching filters,
  * and mitigation items to the matching security events when the reader may
  * see them (links.ts builds both).
+ * Readers may dismiss these items (dismissals.ts): each says what the
+ * traffic did, and once looked at there is nothing left to fix.
  * Times are in UTC, as everywhere in the REST API. The signals are cached
  * for 30 seconds, so the overview and its attention list share one set of
  * ClickHouse queries.
@@ -23,7 +25,7 @@ import type { Outcome } from "@/src/lib/analytics/outcome";
 import { analyticsHref, securityHref } from "@/src/lib/analytics/links";
 import type { AttentionAction, AttentionItem, AttentionProvider } from "./types";
 
-type Item = Omit<AttentionItem, "source">;
+type Item = Omit<AttentionItem, "source" | "dismissible">;
 
 /** How long the signals are reused. */
 export const TRAFFIC_SIGNALS_CACHE_MS = 30_000;
@@ -247,6 +249,7 @@ export const trafficAttentionProvider: AttentionProvider = {
   id: "traffic",
   label: "Traffic",
   permissions: ["analytics:read"],
+  dismissible: true,
   async collect({ access, now }) {
     return trafficItems(access, await cachedTrafficSignals(now.getTime()));
   },

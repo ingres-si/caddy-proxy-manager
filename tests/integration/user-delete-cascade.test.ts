@@ -94,6 +94,9 @@ async function seedReferences(userId: number): Promise<{ rawToken: string; forwa
     backedUp: true, createdAt: now,
   });
   await db.insert(schema.userPreferences).values({ userId, theme: 'dark', updatedAt: now });
+  await db.insert(schema.attentionDismissals).values({
+    userId, source: 'traffic', itemId: `spike:${tag}.example.com`, severity: 'info', until: later, createdAt: now,
+  });
   await db.insert(schema.pendingOAuthLinks).values({
     userId, provider: 'oidc', userEmail: `user-${tag}@example.com`, createdAt: now, expiresAt: later,
   });
@@ -195,6 +198,7 @@ async function referencesTo(userId: number) {
     twoFactors: await countWhere(schema.twoFactors, schema.twoFactors.userId, userId),
     passkeys: await countWhere(schema.passkeys, schema.passkeys.userId, userId),
     userPreferences: await countWhere(schema.userPreferences, schema.userPreferences.userId, userId),
+    attentionDismissals: await countWhere(schema.attentionDismissals, schema.attentionDismissals.userId, userId),
     pendingOAuthLinks: await countWhere(schema.pendingOAuthLinks, schema.pendingOAuthLinks.userId, userId),
     linkStates: await linkStatesFor(userId),
     apiTokens: await countWhere(schema.apiTokens, schema.apiTokens.createdBy, userId),
@@ -221,7 +225,7 @@ type References = Awaited<ReturnType<typeof referencesTo>>;
 
 /** What seedReferences adds for one user. */
 const SEEDED: References = {
-  sessions: 1, accounts: 1, twoFactors: 1, passkeys: 1, userPreferences: 1, pendingOAuthLinks: 1, linkStates: 2, apiTokens: 1, groupMembers: 1,
+  sessions: 1, accounts: 1, twoFactors: 1, passkeys: 1, userPreferences: 1, attentionDismissals: 1, pendingOAuthLinks: 1, linkStates: 2, apiTokens: 1, groupMembers: 1,
   forwardAuthAccess: 1, forwardAuthSessions: 1, auditEvents: 1, proxyHosts: 1, l4ProxyHosts: 1,
   accessLists: 1, accessListRules: 1, certificates: 1, caCertificates: 1, issuedClientCertificates: 1, mtlsRoles: 1,
   mtlsAccessRules: 1, groups: 1, customRoles: 1,
@@ -316,6 +320,7 @@ describe('deleteUser with foreign keys off', () => {
       'access_lists.createdBy set null',
       'accounts.userId cascade',
       'api_tokens.createdBy cascade',
+      'attention_dismissals.userId cascade',
       'audit_events.userId set null',
       'ca_certificates.createdBy set null',
       'certificates.createdBy set null',

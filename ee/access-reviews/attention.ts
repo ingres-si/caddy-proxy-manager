@@ -39,7 +39,7 @@ export const accessReviewsAttentionProvider: AttentionProvider = {
   label: "Access reviews",
   permissions: ["access_reviews:read"],
   async collect({ now }) {
-    const items: Omit<AttentionItem, "source">[] = [];
+    const items: Omit<AttentionItem, "source" | "dismissible">[] = [];
     const open = await appDb.select().from(accessReviewCampaigns).where(eq(accessReviewCampaigns.status, "open")).orderBy(accessReviewCampaigns.id);
     for (const campaign of open) {
       const rows = await appDb.select({ confirmedAt: accessReviewItems.confirmedAt, outcome: accessReviewItems.outcome }).from(accessReviewItems).where(eq(accessReviewItems.campaignId, campaign.id));
