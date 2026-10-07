@@ -7,7 +7,7 @@
  * issues no ids and the plan option cannot be turned on.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import RedisMock from 'ioredis-mock';
+import RedisMock from '../helpers/ioredis-mock';
 import type Redis from 'ioredis';
 import { NextRequest } from 'next/server';
 import { eq } from 'drizzle-orm';
