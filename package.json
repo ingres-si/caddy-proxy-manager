@@ -68,7 +68,7 @@
     "date-fns": "^4.4.0",
     "dayjs": "^1.11.23",
     "drizzle-orm": "^0.45.3",
-    "ioredis": "5.11.1",
+    "ioredis": "6.0.0",
     "kysely": "0.29.6",
     "ldapts": "9.2.0",
     "lucide-react": "^1.49.0",

@@ -200,6 +200,9 @@ function buildIoredisClient(redis: StoredRedisStorage): SharedRedis {
     enableAutoPipelining: true,
     lazyConnect: true,
     connectionName: "ingressi-web",
+    // RESP2, as before ioredis 6: servers without HELLO (Redis < 6) keep
+    // working, and script and hash replies keep the shapes the stores read.
+    protocol: 2,
     ...(tls ? { tls } : {}),
   };
   const retryStrategy = (times: number) => Math.min(250 * times, 5_000);
