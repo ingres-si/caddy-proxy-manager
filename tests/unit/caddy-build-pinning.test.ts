@@ -28,7 +28,11 @@ describe("reproducible Caddy build", () => {
     expect(goMod).toMatch(/github\.com\/caddyserver\/caddy\/v2 v\d+\.\d+\.\d+/);
     expect(goMod).toMatch(/github\.com\/caddyserver\/xcaddy v\d+\.\d+\.\d+/);
     expect(goMod).not.toContain("latest");
-    expect(goMod).toMatch(/replace github\.com\/google\/cel-go => github\.com\/google\/cel-go v\d+\.\d+\.\d+/);
+    // Caddy before 2.11.7 imported github.com/google/cel-go, pinned to Caddy's
+    // version; from 2.11.7 Caddy imports cel.dev/cel-go and needs no pin.
+    expect(goMod).toMatch(
+      /replace github\.com\/google\/cel-go => github\.com\/google\/cel-go v\d+\.\d+\.\d+|\bcel\.dev\/cel-go v\d+\.\d+\.\d+/
+    );
   });
 
   it("resolves every plugin from go.mod and enables Dependabot autobumps", () => {
