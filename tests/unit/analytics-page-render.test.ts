@@ -221,6 +221,32 @@ describe('request log', () => {
     expect(html).toContain('Show more');
   });
 
+  it('folds a run of identical requests into one row, and links a WAF block to its events', () => {
+    const html = renderToStaticMarkup(
+      createElement(RequestLog, {
+        rows: [
+          entry({ path: '/poll', userAgent: '(none)' }),
+          entry({ path: '/poll', userAgent: '(none)', ts: entry({}).ts - 1 }),
+          entry({ path: '/poll', userAgent: '(none)', ts: entry({}).ts - 2 }),
+          entry({ outcome: 'waf', wafRuleId: 920420, status: 403, method: 'POST', path: '/api/traces' }),
+        ],
+        loading: false,
+        error: null,
+        withDay: false,
+        hasMore: false,
+        loadingMore: false,
+        onMore: () => {},
+        mitigatedOnly: false,
+        onMitigatedOnlyChange: () => {},
+      })
+    );
+    expect(html.match(/<tr /g)).toHaveLength(3);
+    expect(html).toContain('×3');
+    expect(html).toContain('No user agent');
+    expect(html).not.toContain('(none)');
+    expect(html).toMatch(/href="\/security\?range=custom[^"]*kind=waf[^"]*"[^>]*>920420</);
+  });
+
   it('says when nothing matches', () => {
     const html = renderToStaticMarkup(
       createElement(RequestLog, {

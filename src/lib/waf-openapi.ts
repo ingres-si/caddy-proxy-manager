@@ -86,6 +86,33 @@ export const WAF_OPENAPI_PATHS = {
       responses: { "201": { description: "Created", content: json(ref("WafExclusion")) }, ...errors("400", "401", "403", "404", "409", "502") },
     },
   },
+  "/api/v1/waf/exclusions/batch": {
+    post: {
+      tags: [TAG],
+      summary: "Add several rule exclusions",
+      description:
+        "Permission waf:write. Adds 1 to 50 exclusions, each as POST /api/v1/waf/exclusions takes it, with one apply: all of them " +
+        "or none. Meant for the suggestions of a WAF event (GET /api/v1/waf/events/{id}/suggested-exclusion). One that exists " +
+        "already answers 409, the same one twice 400; if Caddy refuses the configuration none is kept (502).",
+      operationId: "createWafExclusions",
+      requestBody: {
+        required: true,
+        content: json({
+          type: "object",
+          properties: { exclusions: { type: "array", minItems: 1, maxItems: 50, items: ref("WafExclusionInput") } },
+          required: ["exclusions"],
+          additionalProperties: false,
+        }),
+      },
+      responses: {
+        "201": {
+          description: "Created",
+          content: json({ type: "object", properties: { exclusions: { type: "array", items: ref("WafExclusion") } }, required: ["exclusions"] }),
+        },
+        ...errors("400", "401", "403", "404", "409", "502"),
+      },
+    },
+  },
   "/api/v1/waf/exclusions/{id}": {
     get: {
       tags: [TAG],

@@ -292,6 +292,80 @@ export async function createWafExclusion(
   return (await getWafExclusion(id))!;
 }
 
+/** The most exclusions one batch adds. */
+export const MAX_WAF_EXCLUSION_BATCH = 50;
+
+/**
+ * Adds several exclusions at once (the rules that added to one WAF event's
+ * score, say): all of them or none, with one apply. Refuses the batch when
+ * one of them exists already or is given twice (409).
+ */
+export async function createWafExclusions(
+  inputs: readonly WafExclusionInput[],
+  actorUserId: number | null,
+  options: WafWriteOptions = {}
+): Promise<WafExclusion[]> {
+  if (!Array.isArray(inputs) || inputs.length === 0) throw new ApiValidationError("exclusions must list at least one exclusion");
+  if (inputs.length > MAX_WAF_EXCLUSION_BATCH) throw new ApiValidationError(`exclusions takes at most ${MAX_WAF_EXCLUSION_BATCH} at once`);
+  const parsed = inputs.map((input, index) => {
+    if (!input || typeof input !== "object" || Array.isArray(input)) throw new ApiValidationError(`exclusions[${index}] must be an object`);
+    return { match: parseMatch(input), proxyHostId: parseHostId(input.proxyHostId), reason: parseReason(input.reason) };
+  });
+  parsed.forEach((entry, index) => {
+    const twice = parsed.findIndex(
+      (other, i) =>
+        i < index &&
+        other.proxyHostId === entry.proxyHostId &&
+        other.match.ruleId === entry.match.ruleId &&
+        other.match.path === entry.match.path &&
+        other.match.pathMatch === entry.match.pathMatch &&
+        other.match.variable === entry.match.variable
+    );
+    if (twice !== -1) throw new ApiValidationError(`exclusions[${index}] is the same as exclusions[${twice}]`);
+  });
+
+  const created = await appDb.transaction(async (tx) => {
+    const hosts = new Map<number, { id: number; name: string }>();
+    for (const { proxyHostId } of parsed) {
+      if (proxyHostId !== null && !hosts.has(proxyHostId)) hosts.set(proxyHostId, await hostForWrite(tx, proxyHostId));
+    }
+    const now = nowIso();
+    const rows: { id: number; proxyHostId: number | null }[] = [];
+    for (const { match, proxyHostId, reason } of parsed) {
+      const scope = proxyHostId === null ? isNull(wafRuleExclusions.proxyHostId) : eq(wafRuleExclusions.proxyHostId, proxyHostId);
+      const duplicate = (await tx
+        .select()
+        .from(wafRuleExclusions)
+        .where(and(scope, eq(wafRuleExclusions.ruleId, match.ruleId))))
+        .find((row) => sameMatch(row, match));
+      if (duplicate) throw new ApiConflictError(`The exclusion of ${describeMatch(match)} already exists (id ${duplicate.id})`);
+      const [row] = await tx
+        .insert(wafRuleExclusions)
+        .values({ ...match, proxyHostId, reason, createdBy: actorUserId, createdAt: now, updatedAt: now })
+        .returning();
+      rows.push({ id: row.id, proxyHostId });
+    }
+    for (const scope of new Set(parsed.map((entry) => entry.proxyHostId))) await syncWafExclusionMirror(tx, scope);
+    return { rows, hosts };
+  });
+  const ids = created.rows.map((row) => row.id);
+  await applyOrUndo(options, async (tx) => {
+    await tx.delete(wafRuleExclusions).where(inArray(wafRuleExclusions.id, ids));
+    for (const scope of new Set(parsed.map((entry) => entry.proxyHostId))) await syncWafExclusionMirror(tx, scope);
+  });
+  for (const [index, { match, proxyHostId, reason }] of parsed.entries()) {
+    await logAuditEvent({
+      userId: actorUserId,
+      action: "create",
+      entityType: "waf_exclusion",
+      entityId: ids[index],
+      summary: `Excluded ${describeMatch(match)} for ${scopeLabel(proxyHostId === null ? null : created.hosts.get(proxyHostId) ?? null)}`,
+      data: { ...match, proxyHostId, reason },
+    });
+  }
+  return (await Promise.all(ids.map((id) => getWafExclusion(id)))).filter((exclusion): exclusion is WafExclusion => exclusion !== null);
+}
+
 /**
  * Changes an exclusion's reason, path or variable (its rule and scope stay:
  * a different rule or scope is a different exclusion).

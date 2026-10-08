@@ -307,3 +307,39 @@ export function curlCommand(request: CurlRequest): string {
   }
   return parts.join(" ");
 }
+
+const CONTROL_ESCAPES: Record<string, string> = { "\n": "\\n", "\r": "\\r", "\t": "\\t" };
+
+/** C0 and C1 control characters, DEL, and U+FFFD (bytes that were not UTF-8). */
+function isInvisible(code: number): boolean {
+  return code < 0x20 || (code >= 0x7f && code <= 0x9f) || code === 0xfffd;
+}
+
+/**
+ * Request data as text that shows what is there: control characters (the
+ * CR/LF of a header injection, a NUL) as escapes such as \r\n and \x00, and
+ * U+FFFD as �, instead of boxes.
+ */
+export function visibleText(value: string): string {
+  let out = "";
+  for (const char of value) {
+    const code = char.codePointAt(0)!;
+    if (!isInvisible(code)) out += char;
+    else if (CONTROL_ESCAPES[char]) out += CONTROL_ESCAPES[char];
+    else if (code === 0xfffd) out += "\\ufffd";
+    else out += `\\x${code.toString(16).padStart(2, "0")}`;
+  }
+  return out;
+}
+
+/**
+ * A Coraza "Matched Data: <data> found within <VARIABLE>: <value>" message,
+ * split: what matched (kept exactly, so a CR/LF that matched is not trimmed
+ * away), where, and the whole value it was in. Anything else is `data`.
+ */
+export function splitMatchedData(message: string): { data: string; variable: string | null; value: string | null } {
+  const body = message.replace(/^\s*Matched Data: ?/, "");
+  const match = body.match(/^([\s\S]*?) found within ([A-Z_]+(?::[^\s:]*)?): ([\s\S]*)$/);
+  if (!match) return { data: body, variable: null, value: null };
+  return { data: match[1], variable: match[2], value: match[3] };
+}

@@ -24,11 +24,10 @@ The range is the last hour, 24 hours, 7 days (the default) or 30 days, or a cust
 
 Select an event to open it.
 
-For a WAF event the page reads the stored audit record: every rule that matched, the anomaly points each added, the matched variable and data, the total score against the threshold, and the rule that decided. Then:
+For a WAF event the page reads the stored audit record. It shows the score against the threshold once, then every rule that matched: the points it added, what it checks, what it matched and in which variable (**Show the value** shows the whole value). Control characters are shown as escapes, so the CR/LF a header-injection rule found reads `\r\n`. Then:
 
-- **Nothing: this is working as intended** closes it.
-- **This was a false positive** opens the exclusion form with the narrowest exclusion the record allows: the rule, on the host that served the request, for its path, on the matched variable when the record names one. When several rules added to the score, each is listed. Review it before adding; only add one when the request was legitimate.
-- **Block** the address.
+- **Exclude N rules…** (or **Exclude rule …**) reviews the narrowest exclusions the record allows, together: each rule that added to the score, on the host that served the request, for its exact path, on the variable it matched when the record names one. Untick the ones to keep, give one reason, and they are added at once with a single Caddy apply (all or none). Only exclude when the request was legitimate. When the exclusions exist already, or nothing can be excluded, the page says why.
+- **Block** the address. When the address is one of Cloudflare's, the page says so first: behind Cloudflare that is the edge server, and blocking it blocks every visitor it forwards. Add Cloudflare under **Trusted proxies** (Host defaults) so the real client address is recorded instead.
 - **Copy as curl** copies a command that repeats the request (over HTTPS, with its headers; credentials were redacted when the event was stored). Treat it as untrusted: it repeats what an attacker sent.
 - **Raw audit record** shows the stored Coraza record.
 - **Open in analytics** shows all traffic from the address.
@@ -60,7 +59,7 @@ The page's data comes from the analytics API (permission `analytics:read`); the 
 | `GET /api/v1/analytics/security/hosts` | Most targeted hosts, with the proxy host serving each. |
 | `GET /api/v1/analytics/security/events` | The event list: `kind`, `filters` (JSON, on `host`, `path`, `country`, `ip`, `method`, `waf_rule`), `limit`, `offset`. A WAF event's `eventId` is its id in the WAF API. |
 | `GET /api/v1/waf/events/{id}/explain` | Why a WAF event was blocked. |
-| `GET /api/v1/waf/events/{id}/suggested-exclusion` | Its suggested exclusions; post one to `/api/v1/waf/exclusions`. |
+| `GET /api/v1/waf/events/{id}/suggested-exclusion` | Its suggested exclusions; post one to `/api/v1/waf/exclusions`, or several to `/api/v1/waf/exclusions/batch` (`{ "exclusions": [...] }`, all or none, one apply). |
 | `POST /api/v1/access-lists/blocked-sources/entries` | Block an address: `{"address": "198.51.100.7", "reason": "...", "expiresInSeconds": 86400}`. |
 
 ```bash

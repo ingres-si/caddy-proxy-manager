@@ -114,6 +114,7 @@ When one rule of a chain is dropped, the whole chain is dropped. Rules stored be
 | --- | --- |
 | `GET/PUT /api/v1/settings/waf` | Global settings: `enabled`, `mode`, `load_owasp_crs`, `paranoia_level`, `detection_paranoia_level`, `inbound_anomaly_threshold`, `outbound_anomaly_threshold`, `anomaly_action` (`block` or `log`), body limits, custom directives, `excluded_rule_ids`. |
 | `GET/POST /api/v1/waf/exclusions`, `GET/PATCH/DELETE /api/v1/waf/exclusions/{id}` | Rule exclusions. |
+| `POST /api/v1/waf/exclusions/batch` | Several exclusions at once (`{ "exclusions": [...] }`, 1 to 50): all or none, with one apply. |
 | `GET /api/v1/waf/hosts`, `GET/PUT /api/v1/waf/hosts/{id}` | Per-host modes: `{"mode": "inherit" \| "off" \| "detection_only" \| "block"}`. |
 | `GET /api/v1/waf/events` | Events, newest first; `id` is Coraza's transaction id. |
 | `GET /api/v1/waf/events/{id}/explain` | Why the request was blocked. |

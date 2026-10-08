@@ -72,6 +72,8 @@ export type SecurityPageData = {
   };
   /** Addresses on this page that the Blocked sources list already blocks. */
   blockedIps: string[];
+  /** Shown addresses that belong to a CDN (Cloudflare): the edge server, not the client, unless the CDN is a trusted proxy. */
+  cdnIps: Record<string, string>;
   /** Proxy hosts an exclusion can be limited to. */
   exclusionHosts: WafExclusionHostOption[];
   /** The proxy host serving each WAF event's host name on this page, when one does. */

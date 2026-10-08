@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { cdnAddresses } from "@/src/lib/cdn-ranges";
 import { requirePermission } from "@/src/lib/auth";
 import { can } from "@/src/lib/permissions";
 import { ApiValidationError } from "@/src/lib/api-errors";
@@ -216,6 +217,7 @@ export default async function SecurityEventsPage({ searchParams }: { searchParam
       filterError,
     },
     blockedIps: blockedAddresses(blockedList, shownIps),
+    cdnIps: cdnAddresses(shownIps),
     exclusionHosts: proxyHosts.map((host) => ({ id: host.id, name: host.name, domains: host.domains })),
     eventHostIds: Object.fromEntries(
       [...new Set(eventList.filter((event) => event.kind === "waf").map((event) => event.host))].flatMap((name) => {

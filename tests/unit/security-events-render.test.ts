@@ -93,6 +93,7 @@ function data(overrides: Partial<SecurityPageData> = {}): SecurityPageData {
       filterError: null,
     },
     blockedIps: ['203.0.113.66'],
+    cdnIps: {},
     exclusionHosts: [{ id: 4, name: 'App', domains: ['app.example.com'] }],
     eventHostIds: { 'app.example.com': 4 },
     rateLimitInUse: false,

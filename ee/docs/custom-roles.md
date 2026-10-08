@@ -268,6 +268,7 @@ Every guard of a route, page or server action and the permission it checks. Rout
 | `app/(dashboard)/waf/actions.ts` | `saveWafSettingsAction` | `waf:write` |
 | `app/(dashboard)/waf/actions.ts` | `setWafHostModeAction` | `waf:write` |
 | `app/(dashboard)/waf/actions.ts` | `createWafExclusionAction` | `waf:write` |
+| `app/(dashboard)/waf/actions.ts` | `createWafExclusionsAction` | `waf:write` |
 | `app/(dashboard)/waf/actions.ts` | `deleteWafExclusionAction` | `waf:write` |
 | `app/(dashboard)/waf/actions.ts` | `explainWafEventAction` | `waf:read` |
 | `app/(dashboard)/waf/page.tsx` | `WafPage` | `waf:read` |
@@ -642,6 +643,7 @@ Every guard of a route, page or server action and the permission it checks. Rout
 | `app/api/v1/waf/exclusions/[id]/route.ts` | `GET` | `waf:read` |
 | `app/api/v1/waf/exclusions/[id]/route.ts` | `PATCH` | `waf:write` |
 | `app/api/v1/waf/exclusions/[id]/route.ts` | `DELETE` | `waf:write` |
+| `app/api/v1/waf/exclusions/batch/route.ts` | `POST` | `waf:write` |
 | `app/api/v1/waf/exclusions/route.ts` | `GET` | `waf:read` |
 | `app/api/v1/waf/exclusions/route.ts` | `POST` | `waf:write` |
 | `app/api/v1/waf/hosts/[id]/route.ts` | `GET` | `waf:read` |

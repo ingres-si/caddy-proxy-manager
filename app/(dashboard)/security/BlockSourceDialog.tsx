@@ -11,7 +11,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { blockSourceAction } from "../access-lists/actions";
 
 /** An address to block, with a note that becomes the entry's reason. */
-export type BlockTarget = { ip: string; country?: string | null; note?: string };
+export type BlockTarget = {
+  ip: string;
+  country?: string | null;
+  note?: string;
+  /** The CDN the address belongs to (Cloudflare), when it does. */
+  cdn?: string | null;
+};
 
 const EXPIRY = [
   { value: "never", label: "Never", seconds: null },
@@ -24,6 +30,26 @@ type ExpiryValue = (typeof EXPIRY)[number]["value"];
 
 /** Longest reason an access list rule keeps (MAX_RULE_NOTE_LENGTH). */
 const MAX_REASON = 500;
+
+/**
+ * Said before blocking an address of a CDN: it is the CDN's edge server,
+ * and blocking it blocks every visitor that server forwards. The fix is to
+ * trust the CDN as a proxy, so the real client address is recorded.
+ */
+export function CdnWarning({ ip, cdn, className }: { ip: string; cdn: string; className?: string }) {
+  return (
+    <p role="note" className={`m-0 rounded-[10px] border border-warn/40 bg-warn-tint px-3 py-2.5 text-[13px] ${className ?? ""}`}>
+      <span className="font-semibold">
+        <span className="num">{ip}</span> is a {cdn} address.
+      </span>{" "}
+      Behind {cdn}, blocking it blocks every visitor that {cdn} server forwards. Add {cdn} under{" "}
+      <Link href="/proxy-hosts/defaults#trusted-proxies" className="text-brand underline-offset-4 hover:underline">
+        Trusted proxies
+      </Link>{" "}
+      so the real client address is recorded, and block that one.
+    </p>
+  );
+}
 
 /**
  * Confirms blocking an address: it becomes a deny entry of the global
@@ -82,6 +108,7 @@ export function BlockSourceDialog({ target, onClose, onBlocked }: { target: Bloc
             submit();
           }}
         >
+          {target?.cdn && <CdnWarning ip={target.ip} cdn={target.cdn} />}
           <div className="flex flex-col gap-1.5">
             <span className="text-sm font-medium">
               Unblock after

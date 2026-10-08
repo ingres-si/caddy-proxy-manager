@@ -31,6 +31,7 @@ import { getSetting, saveWafSettings, setSetting } from '../../src/lib/settings'
 import { createProxyHost, deleteProxyHost, getProxyHost, updateProxyHost } from '../../src/lib/models/proxy-hosts';
 import {
   createWafExclusion,
+  createWafExclusions,
   deleteWafExclusion,
   importLegacyWafExclusionsNow,
   LEGACY_EXCLUSION_REASON,
@@ -199,6 +200,47 @@ describe('records and their mirror', () => {
     await expect(deleteWafExclusion(kept.id, userId, { apply: vi.fn().mockRejectedValue(new Error('down')) })).rejects.toBeInstanceOf(WafApplyError);
     expect(await rows()).toHaveLength(1);
     expect(await hostMeta(id)).toEqual({ waf: { excluded_rule_ids: [942100] } });
+  });
+});
+
+describe('several exclusions at once', () => {
+  it('adds them all with one apply and an audit event each', async () => {
+    const id = await insertHost('Langfuse', ['langfuse.example.com']);
+    const apply = vi.fn().mockResolvedValue(undefined);
+    const created = await createWafExclusions(
+      [
+        { ruleId: 921150, proxyHostId: id, path: '/api/public/otel/v1/traces', pathMatch: 'exact', variable: 'ARGS_NAMES', reason: 'OTel traces' },
+        { ruleId: 932235, proxyHostId: id, path: '/api/public/otel/v1/traces', pathMatch: 'exact', reason: 'OTel traces' },
+      ],
+      userId,
+      { apply }
+    );
+    expect(created.map((exclusion) => [exclusion.ruleId, exclusion.variable])).toEqual([[921150, 'ARGS_NAMES'], [932235, null]]);
+    expect(apply).toHaveBeenCalledTimes(1);
+    expect(await rows()).toHaveLength(2);
+    expect(vi.mocked(logAuditEvent).mock.calls.map(([event]) => event.entityType)).toEqual(['waf_exclusion', 'waf_exclusion']);
+  });
+
+  it('adds none when one of them is refused or Caddy refuses them', async () => {
+    const id = await insertHost('App', ['app.example.com']);
+    await createWafExclusion({ ruleId: 942100, proxyHostId: id, path: '/a', reason: 'x' }, userId);
+    await expect(
+      createWafExclusions([{ ruleId: 942200, proxyHostId: id, path: '/a' }, { ruleId: 942100, proxyHostId: id, path: '/a' }], userId)
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(createWafExclusions([{ ruleId: 942200 }, { ruleId: 942200 }], userId)).rejects.toMatchObject({ status: 400 });
+    await expect(createWafExclusions([{ ruleId: 942200 }, { ruleId: 949110 }], userId)).rejects.toMatchObject({ status: 400 });
+    await expect(createWafExclusions([], userId)).rejects.toMatchObject({ status: 400 });
+    await expect(createWafExclusions(Array.from({ length: 51 }, (_, i) => ({ ruleId: 942000 + i })), userId)).rejects.toMatchObject({ status: 400 });
+    expect(await rows()).toHaveLength(1);
+
+    vi.mocked(logAuditEvent).mockClear();
+    const refuse = vi.fn().mockRejectedValueOnce(new Error('Caddy rejected the configuration')).mockResolvedValue(undefined);
+    await expect(createWafExclusions([{ ruleId: 942200, proxyHostId: id }, { ruleId: 942300, proxyHostId: id }], userId, { apply: refuse })).rejects.toBeInstanceOf(
+      WafApplyError
+    );
+    expect(await rows()).toHaveLength(1);
+    expect(await hostMeta(id)).toBeNull();
+    expect(logAuditEvent).not.toHaveBeenCalled();
   });
 });
 

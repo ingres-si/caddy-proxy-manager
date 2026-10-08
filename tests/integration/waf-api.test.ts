@@ -42,6 +42,7 @@ import { applyCaddyConfig } from '../../src/lib/caddy';
 import { setSetting, getSetting } from '../../src/lib/settings';
 import { GET as listExclusions, POST as createExclusion } from '../../app/api/v1/waf/exclusions/route';
 import { GET as getExclusion, PATCH as patchExclusion, DELETE as deleteExclusion } from '../../app/api/v1/waf/exclusions/[id]/route';
+import { POST as createExclusions } from '../../app/api/v1/waf/exclusions/batch/route';
 import { GET as listHosts } from '../../app/api/v1/waf/hosts/route';
 import { GET as getHost, PUT as putHost } from '../../app/api/v1/waf/hosts/[id]/route';
 import { GET as listEvents } from '../../app/api/v1/waf/events/route';
@@ -185,6 +186,24 @@ describe('exclusions', () => {
   });
 });
 
+describe('several exclusions at once', () => {
+  it('adds them with one apply, all or none', async () => {
+    vi.mocked(applyCaddyConfig).mockClear();
+    const body = { exclusions: [{ ruleId: 921150, proxyHostId: appId, path: '/api/traces', variable: 'ARGS_NAMES', reason: 'OTel' }, { ruleId: 932235, proxyHostId: appId, path: '/api/traces' }] };
+    const response = await createExclusions(request({ method: 'POST', body }));
+    expect(response.status).toBe(201);
+    expect((await response.json()).exclusions.map((exclusion: { ruleId: number }) => exclusion.ruleId)).toEqual([921150, 932235]);
+    expect(applyCaddyConfig).toHaveBeenCalledTimes(1);
+
+    // One of them exists now: none of the batch is added.
+    expect((await createExclusions(request({ method: 'POST', body: { exclusions: [{ ruleId: 942100 }, body.exclusions[1]] } }))).status).toBe(409);
+    expect(await ctx.db.select().from(schema.wafRuleExclusions)).toHaveLength(2);
+    for (const bad of [{}, { exclusions: 'x' }, { exclusions: [] }, { exclusions: [1] }, { exclusions: [{ ruleId: 942100, extra: 1 }] }, { exclusions: [], more: 1 }]) {
+      expect((await createExclusions(request({ method: 'POST', body: bad }))).status, JSON.stringify(bad)).toBe(400);
+    }
+  });
+});
+
 describe('per-host modes', () => {
   it('lists hosts with their mode and sets one, keeping the rest of their WAF settings', async () => {
     await setSetting('waf', { enabled: false, mode: 'On', load_owasp_crs: true, custom_directives: '' });
@@ -321,6 +340,7 @@ describe('OpenAPI', () => {
     const spec = await (await openapi(request({ path: '/api/v1/openapi.json' }))).json();
     const operations: Record<string, string[]> = {
       '/api/v1/waf/exclusions': ['get', 'post'],
+      '/api/v1/waf/exclusions/batch': ['post'],
       '/api/v1/waf/exclusions/{id}': ['get', 'patch', 'delete'],
       '/api/v1/waf/hosts': ['get'],
       '/api/v1/waf/hosts/{id}': ['get', 'put'],

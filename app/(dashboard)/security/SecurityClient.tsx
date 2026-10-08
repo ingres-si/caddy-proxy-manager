@@ -462,6 +462,7 @@ function TopSources({ data, blocked, onBlock }: { data: SecurityPageData; blocke
                             onBlock({
                               ip: source.ip,
                               country: source.country,
+                              cdn: Object.hasOwn(data.cdnIps, source.ip) ? data.cdnIps[source.ip] : null,
                               note: `From Security events: ${formatCount(events)} events${source.rules.length > 0 ? `, WAF rules ${source.rules.slice(0, 5).join(", ")}` : ""}`,
                             })
                           }
@@ -573,10 +574,12 @@ export default function SecurityClient({ data }: { data: SecurityPageData }) {
               canReadSettings: data.permissions.canReadSettings,
               blockDisabledReason: data.permissions.blockDisabledReason,
               blockedIps: blocked,
+              cdnIps: data.cdnIps,
               ruleEvents,
               eventHostIds: data.eventHostIds,
               onBlock: setBlockTarget,
               onAddExclusion: openExclusion,
+              onExcluded: () => router.refresh(),
             }}
           />
         </>

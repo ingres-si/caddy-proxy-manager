@@ -275,3 +275,41 @@ export function chartCsv(input: {
   });
   return `${lines.join("\r\n")}\r\n`;
 }
+
+/** A run of identical requests in the request log: the newest, how many, and when the run started. */
+export type RequestRun<T> = { row: T; count: number; firstTs: number };
+
+/** Requests within this many seconds of each other with nothing else differing are one run. */
+const RUN_GAP_SECONDS = 60;
+
+/**
+ * The request log with runs of identical requests (same outcome, method,
+ * host, path, status, source, user agent and WAF rule, each within a minute
+ * of the next) folded into one row with a count. Newest first, as given.
+ */
+export function collapseRequestRuns<
+  T extends { ts: number; outcome: string; method: string; host: string; path: string; status: number; ip: string; userAgent: string; wafRuleId: number }
+>(rows: readonly T[]): RequestRun<T>[] {
+  const runs: RequestRun<T>[] = [];
+  for (const row of rows) {
+    const last = runs[runs.length - 1];
+    const same =
+      last &&
+      last.row.outcome === row.outcome &&
+      last.row.method === row.method &&
+      last.row.host === row.host &&
+      last.row.path === row.path &&
+      last.row.status === row.status &&
+      last.row.ip === row.ip &&
+      last.row.userAgent === row.userAgent &&
+      last.row.wafRuleId === row.wafRuleId &&
+      Math.abs(last.firstTs - row.ts) <= RUN_GAP_SECONDS;
+    if (same) {
+      last.count += 1;
+      last.firstTs = Math.min(last.firstTs, row.ts);
+    } else {
+      runs.push({ row, count: 1, firstTs: row.ts });
+    }
+  }
+  return runs;
+}

@@ -8,7 +8,7 @@ import { getSetting, getWafSettings, saveWafSettings, clearSetting, setSetting, 
 import { SettingsValidationError, validateSettingsGroup } from "@/src/lib/settings-validation";
 import { withSettingsUpdateLock } from "@/src/lib/settings-update-lock";
 import { logAuditEvent } from "@/src/lib/audit";
-import { createWafExclusion, deleteWafExclusion, WafApplyError, type WafExclusion } from "@/src/lib/models/waf-exclusions";
+import { createWafExclusion, createWafExclusions, deleteWafExclusion, WafApplyError, type WafExclusion } from "@/src/lib/models/waf-exclusions";
 import { readGlobalWafExclusionRows, restoreGlobalWafExclusionRows } from "@/src/lib/models/waf-exclusion-mirror";
 import { setWafHostMode, type WafHostView } from "@/src/lib/waf-hosts";
 import { isWafHostMode, type WafHostMode } from "@/src/lib/waf-host-mode";
@@ -127,6 +127,33 @@ export async function createWafExclusionAction(input: WafExclusionActionInput): 
     return { ok: true, value: exclusion, message: `Rule ${exclusion.ruleId} excluded.` };
   } catch (error) {
     return failure(error, "Could not add the exclusion.");
+  }
+}
+
+/** Adds several exclusions with one apply (the suggestions of a WAF event): all or none. */
+export async function createWafExclusionsAction(inputs: WafExclusionActionInput[]): Promise<WafActionResult<WafExclusion[]>> {
+  const session = await requirePermission("waf:write");
+  try {
+    const exclusions = await createWafExclusions(
+      inputs.map((input) => ({
+        ruleId: input.ruleId,
+        proxyHostId: input.proxyHostId,
+        path: input.path || null,
+        pathMatch: input.path ? input.pathMatch ?? undefined : undefined,
+        variable: input.variable || null,
+        reason: input.reason ?? "",
+      })),
+      Number(session.user.id),
+      { apply: applyCaddyConfig }
+    );
+    revalidateWaf();
+    return {
+      ok: true,
+      value: exclusions,
+      message: exclusions.length === 1 ? `Rule ${exclusions[0].ruleId} excluded.` : `${exclusions.length} rules excluded.`,
+    };
+  } catch (error) {
+    return failure(error, "Could not add the exclusions.");
   }
 }
 
