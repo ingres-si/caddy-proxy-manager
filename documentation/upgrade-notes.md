@@ -2,7 +2,7 @@
 
 Pull the new images and recreate the containers with `docker compose pull && docker compose up -d`. (`docker compose restart` does not re-read `.env`.)
 
-## Upgrading to v2.1.1
+## Upgrading to v2.2.0
 
 Nothing to change. Two database migrations run on start: a table for dismissed Needs attention items and three columns on `user_preferences` for the default list ordering. The Caddy image moves to Caddy 2.11.7.
 
