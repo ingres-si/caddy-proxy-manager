@@ -45,7 +45,7 @@ test.describe('Proxy Hosts', () => {
     await expect(page.getByLabel('Add domains')).toBeVisible();
   });
 
-  test('the edit deep link opens the host editor of that host', async ({ page }) => {
+  test('the edit deep link opens that host\'s page at Routing', async ({ page }) => {
     const origin = new URL(page.url()).origin;
     const created = await (await page.request.post(API_PROXY_HOSTS, {
       headers: { Origin: origin },
@@ -53,8 +53,9 @@ test.describe('Proxy Hosts', () => {
     })).json() as { id: number };
     try {
       await page.goto(`/proxy-hosts?edit=${created.id}`);
-      await expect(page).toHaveURL(new RegExp(`/proxy-hosts/${created.id}/edit$`));
-      await expect(page.getByRole('heading', { level: 1, name: 'Edit Edit Deep Link Host' })).toBeVisible();
+      await expect(page).toHaveURL(new RegExp(`/proxy-hosts/${created.id}#routing$`));
+      await expect(page.getByRole('heading', { level: 1, name: 'edit-deep-link.local' })).toBeVisible();
+      await expect(page.getByRole('tab', { name: /^Routing/ })).toHaveAttribute('aria-selected', 'true');
     } finally {
       await page.request.delete(`${API_PROXY_HOSTS}/${created.id}`, { headers: { Origin: origin } });
     }
@@ -289,21 +290,23 @@ test.describe('Proxy Hosts', () => {
       await expect(page).toHaveURL(new RegExp(`/proxy-hosts/${created.id}$`));
       await expect(page.getByRole('heading', { level: 1, name: 'detail-page.local' })).toBeVisible();
       await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Proxy hosts' })).toHaveAttribute('href', '/proxy-hosts');
-      const tabs = page.getByRole('navigation', { name: 'Host sections' });
-      await expect(tabs.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
-      await expect(tabs.getByRole('link', { name: 'Routing' })).toHaveAttribute('href', `/proxy-hosts/${created.id}/edit?section=routing`);
-      await expect(page.getByRole('link', { name: 'Edit host' })).toHaveAttribute('href', `/proxy-hosts/${created.id}/edit`);
+      // One page: Overview, the editor's sections and History are tabs of it.
+      await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+      await expect(page.getByRole('tab', { name: /^Routing/ })).toHaveAttribute('href', '#routing');
+      await expect(page.getByRole('link', { name: 'Edit host' })).toHaveCount(0);
       await expect(page.getByRole('heading', { name: 'Configuration' })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Upstreams' })).toBeVisible();
       await expect(page.getByText('http://localhost:9779')).toBeVisible();
       await expect(page.getByText('Health checks are off')).toBeVisible();
+      await page.getByRole('tab', { name: /^History/ }).click();
       await expect(page.getByRole('heading', { name: 'Changes to this host' })).toBeVisible();
+      await page.getByRole('tab', { name: 'Overview' }).click();
       // Nothing needs attention: that is all the status says, not that the upstreams were checked.
       await expect(page.getByText('No issues', { exact: true }).first()).toBeVisible();
 
       // Turn on health checks: the editor opens with passive checks on, as an unsaved change.
       await page.getByRole('link', { name: 'Turn on health checks' }).click();
-      await expect(page).toHaveURL(new RegExp(`/proxy-hosts/${created.id}/edit#routing$`));
+      await expect(page).toHaveURL(new RegExp(`/proxy-hosts/${created.id}#routing$`));
       const passive = page.getByRole('switch', { name: 'Passive health checks' });
       await expect(passive).toBeChecked();
       await expect(passive).toBeFocused();

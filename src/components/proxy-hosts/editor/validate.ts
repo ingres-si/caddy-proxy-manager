@@ -192,21 +192,22 @@ export function validateForm(form: HostForm, context: ValidationContext): FieldE
     }
   });
 
-  // Access
+  // Security: geo blocking
   const geo = form.geoblock;
   if (geo.enabled) {
-    checkInteger(errors, "f-geo-status", geo.responseStatus, 100, 599, "access", "a status code");
+    checkInteger(errors, "f-geo-status", geo.responseStatus, 100, 599, "security", "a status code");
     if (geo.redirectUrl.trim() && !isHttpUrl(geo.redirectUrl.trim())) {
-      errors["f-geo-redirect"] = { message: "Enter an http:// or https:// address.", section: "access" };
+      errors["f-geo-redirect"] = { message: "Enter an http:// or https:// address.", section: "security" };
     }
     const badRange = [...geo.blockCidrs, ...geo.allowCidrs].find((cidr) => !CIDR.test(cidr));
-    if (badRange) errors["f-geo-ranges"] = { message: `${badRange} is not a range such as 10.0.0.0/8.`, section: "access" };
+    if (badRange) errors["f-geo-ranges"] = { message: `${badRange} is not a range such as 10.0.0.0/8.`, section: "security" };
     geo.headers.forEach((row, index) => {
       if (row.name.trim() && !/^[a-zA-Z0-9\-_]+$/.test(row.name.trim())) {
-        errors[`f-geo-header-${index}`] = { message: "Header names use letters, digits, - and _.", section: "access" };
+        errors[`f-geo-header-${index}`] = { message: "Header names use letters, digits, - and _.", section: "security" };
       }
     });
   }
+  // Access
   if (form.signIn === "authentik") {
     if (!form.authentik.outpostDomain.trim()) errors["f-ak-domain"] = { message: "Enter the outpost domain.", section: "access" };
     if (!form.authentik.outpostUpstream.trim()) errors["f-ak-upstream"] = { message: "Enter the outpost's address.", section: "access" };

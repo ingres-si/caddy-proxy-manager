@@ -183,7 +183,7 @@ export function WafHostsSection({
                 </td>
                 <td className="py-2.5 pl-2.5 pr-4 text-right">
                   <Link
-                    href={`/proxy-hosts/${host.id}/edit#waf`}
+                    href={`/proxy-hosts/${host.id}#waf`}
                     aria-label={`Edit WAF settings for ${host.name}`}
                     className="text-sm text-primary hover:underline"
                   >

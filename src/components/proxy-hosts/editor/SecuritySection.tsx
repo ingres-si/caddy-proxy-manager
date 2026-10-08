@@ -4,15 +4,15 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RATE_LIMIT_KEYS, RATE_LIMIT_KEY_LABELS, RATE_LIMIT_LIMITS, RATE_LIMIT_METHODS, type RateLimitKey } from "@/lib/rate-limit-rules";
 import { appendQuickTemplate, HOST_TEMPLATE_ID_OFFSET, WAF_QUICK_TEMPLATES } from "@/lib/waf-quick-templates";
 import type { WafHostMode } from "@/lib/waf-host-mode";
-import { AddButton, EditorCard, Field, FieldError, RemoveButton, TextField, WasHint, useEditor, useFieldProps } from "./fields";
+import { AddButton, EditorCard, Field, FieldError, RemoveButton, TextField, ToggleRow, WasHint, useEditor, useFieldProps } from "./fields";
 import { NativeSelect, SegmentedField, SelectField } from "./controls";
 import { rateLimitRow, type RateLimitRuleRow, type WafForm } from "./model";
+import { GeoBlockCard } from "./GeoBlockCard";
 
 const GLOBAL_MODE = { On: "blocking", DetectionOnly: "detection only", Off: "off" } as const;
 
@@ -114,12 +114,14 @@ function WafCard() {
               ]}
               hint={form.waf.rules === "override" ? "Global exclusions and directives do not apply." : undefined}
             />
-            <div className="flex items-start gap-2.5">
-              <Checkbox id="f-waf-crs" checked={form.waf.loadCrs} onCheckedChange={(checked) => setWaf({ loadCrs: checked === true })} className="mt-0.5" />
-              <label htmlFor="f-waf-crs" className="cursor-pointer text-[13px] font-medium">
-                Load the OWASP Core Rule Set
-              </label>
-            </div>
+            <ToggleRow
+              id="f-waf-crs"
+              className="py-0"
+              label="OWASP Core Rule Set"
+              description="The common attack rules most hosts need."
+              checked={form.waf.loadCrs}
+              onChange={(loadCrs) => setWaf({ loadCrs })}
+            />
           </div>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(190px,100%),1fr))] gap-x-4 gap-y-3">
             <TextField id="f-waf-body" label="Max request body, MiB" value={form.waf.bodyLimit} onChange={(bodyLimit) => setWaf({ bodyLimit })} placeholder={defaultLabel} inputMode="numeric" mono />
@@ -454,6 +456,7 @@ export function SecuritySection() {
       <WafCard />
       <ExclusionsCard />
       <RateLimitCard />
+      <GeoBlockCard />
     </>
   );
 }

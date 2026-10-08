@@ -12,8 +12,8 @@ import type { HostApprovalContext } from "@/ee/approvals/types";
 
 /*
  * Creating, editing and copying a proxy host happen in the host editor
- * (src/components/proxy-hosts/editor, pages /proxy-hosts/new and
- * /proxy-hosts/[id]/edit). Deleting stays a confirmation dialog.
+ * (src/components/proxy-hosts/editor: /proxy-hosts/new, and the tabs of
+ * a host's page). Deleting stays a confirmation dialog.
  */
 
 /** Props the create and edit dialogs took; the form props are accepted and unused. */
@@ -39,7 +39,7 @@ export function CreateHostDialog({ open, initialData, initialDomain }: LegacyDia
 export function EditHostDialog({ open, host }: LegacyDialogProps & { host: ProxyHost }) {
     const router = useRouter();
     useEffect(() => {
-        if (open) router.push(`/proxy-hosts/${host.id}/edit`);
+        if (open) router.push(`/proxy-hosts/${host.id}#routing`);
     }, [open, host.id, router]);
     return null;
 }

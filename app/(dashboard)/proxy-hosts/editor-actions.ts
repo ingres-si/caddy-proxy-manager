@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/src/lib/auth";
 import { previewProxyHostChange, submitProxyHostChange, type HostChangeResult } from "@/src/lib/proxy-host-changes";
 import type { HostChangePreview } from "@/ee/approvals/requests";
+import { CaddyApplyError } from "@/src/lib/caddy-apply-error";
 
 export type HostEditorSaveState = HostChangeResult | { status: "error"; message: string };
 export type HostEditorPreviewState =
@@ -32,6 +33,16 @@ export async function saveProxyHostEditorAction(id: number | null, payload: unkn
     if (result.status === "submitted") revalidatePath("/approvals");
     return result;
   } catch (error) {
+    // Stored, but Caddy did not take it: the change is saved and applied once an apply succeeds.
+    const storedId = error instanceof CaddyApplyError ? id ?? error.proxyHostId ?? null : null;
+    if (error instanceof CaddyApplyError && storedId !== null) {
+      revalidatePath("/proxy-hosts");
+      return {
+        status: "saved",
+        hostId: storedId,
+        message: `Saved, but not live yet: ${error.message}. Caddy keeps serving its previous configuration until an apply succeeds.`,
+      };
+    }
     console.error(`Failed to save proxy host ${id ?? "(new)"}:`, error);
     return { status: "error", message: errorMessage(error, "The proxy host could not be saved. Check the logs for details.") };
   }

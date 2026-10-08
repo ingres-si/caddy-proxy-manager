@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -9,7 +9,7 @@ import { useFormat } from "@/src/components/preferences/PreferencesProvider";
 import type { HostDetail, HostChangeEntry } from "@/src/lib/proxy-host-detail";
 import type { HostAttention } from "@/src/lib/proxy-host-view";
 import { primaryDomain, statusText } from "@/src/lib/proxy-host-view";
-import { HOST_EDITOR_SECTION_LABELS, type HostEditorSection } from "@/src/lib/proxy-host-config-summary";
+import type { HostEditorSection } from "@/src/lib/proxy-host-config-summary";
 import type { ProxyHostHealth, UpstreamHealth, UpstreamStatus } from "@/src/lib/upstream-health";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -24,7 +24,10 @@ import { Button } from "@/components/ui/button";
 import { formatBytes, formatCount, formatPercent } from "@/components/ui/chart-format";
 import { cn } from "@/lib/utils";
 import { toggleProxyHostAction } from "../actions";
-import { hostAnalyticsHref, hostAuditHref, hostEditorHref, hostHealthChecksHref, hostHref, historyVersionHref, siteUrl } from "../links";
+import { hostAnalyticsHref, hostAuditHref, HEALTH_CHECKS_TARGET, historyVersionHref, siteUrl } from "../links";
+import { HostEditor } from "@/src/components/proxy-hosts/editor/HostEditor";
+import { TabAnchor } from "@/src/components/proxy-hosts/editor/TabAnchor";
+import type { HostEditorData } from "@/src/components/proxy-hosts/editor/types";
 import { CertificateSummary, ProtectionPills, TagChips, useHostStatus } from "../host-parts";
 import { ErrorShareLine } from "./ErrorShareLine";
 
@@ -49,8 +52,6 @@ const SECTION_ICONS: Record<HostEditorSection, LucideIcon> = {
   headers: AlignLeft,
   advanced: Settings2,
 };
-
-const TAB_SECTIONS: HostEditorSection[] = ["routing", "security", "access", "certificate", "headers"];
 
 const BADGE_CLASS: Record<StatusTone, string> = {
   ok: "bg-ok-tint text-ok",
@@ -83,21 +84,6 @@ function plural(n: number, one: string, many = `${one}s`): string {
   return `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 }
 
-function TabLink({ href, current = false, children }: { href: string; current?: boolean; children: ReactNode }) {
-  return (
-    <Link
-      href={href}
-      aria-current={current ? "page" : undefined}
-      className={cn(
-        "-mb-px flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 text-sm",
-        current ? "border-brand font-semibold text-foreground" : "border-transparent font-medium text-muted-foreground hover:text-foreground"
-      )}
-    >
-      {children}
-    </Link>
-  );
-}
-
 function upstreamText(upstream: UpstreamHealth): string {
   const parts: string[] = [];
   switch (upstream.status) {
@@ -125,16 +111,16 @@ function upstreamText(upstream: UpstreamHealth): string {
   return parts.join(" · ");
 }
 
-function HealthChecks({ health, hostId, upstreams, canWrite }: { health: ProxyHostHealth; hostId: number; upstreams: number; canWrite: boolean }) {
+function HealthChecks({ health, upstreams, canWrite }: { health: ProxyHostHealth; upstreams: number; canWrite: boolean }) {
   const { active, passive, loadBalancing } = health.healthChecks;
   if (!active && !passive) {
     return (
       <div className="flex flex-col gap-1 rounded-[10px] bg-panel2 px-3 py-2.5 text-[13px]">
         <span className="font-semibold">Health checks are off</span>
         {canWrite && (
-          <Link href={hostHealthChecksHref(hostId)} className="mt-0.5 self-start text-brand underline-offset-4 hover:underline">
+          <a href={`#${HEALTH_CHECKS_TARGET}`} className="mt-0.5 self-start text-brand underline-offset-4 hover:underline">
             Turn on health checks
-          </Link>
+          </a>
         )}
       </div>
     );
@@ -286,7 +272,14 @@ const CLASS_COLORS: [string, string][] = [
   ["5xx", "var(--err5)"],
 ];
 
-export default function HostDetailClient({ host, detail, can: allowed }: { host: HostInfo; detail: HostDetail; can: Allowed }) {
+/**
+ * A proxy host's page: one header and one tab bar for everything about the
+ * host. Overview (traffic, upstreams, configuration), the editor's sections
+ * (Routing … Advanced, for roles that may change hosts) and History switch in
+ * place (#routing …), so looking at a host and changing it never leave the
+ * page. Without proxy_hosts:write it has Overview and History only.
+ */
+export default function HostDetailClient({ host, detail, can: allowed, editor = null }: { host: HostInfo; detail: HostDetail; can: Allowed; editor?: HostEditorData | null }) {
   const router = useRouter();
   const format = useFormat();
   const [toggling, startToggle] = useTransition();
@@ -321,72 +314,51 @@ export default function HostDetailClient({ host, detail, can: allowed }: { host:
         })).filter((segment) => segment.fraction > 0)
       : [];
 
-  return (
-    <div className="flex min-w-0 flex-col gap-[18px]">
-      <PageHeader
-        className="mb-0"
-        breadcrumb={["Traffic", { label: "Proxy hosts", href: "/proxy-hosts" }, domain]}
-        title={<span className="[overflow-wrap:anywhere]">{domain}</span>}
-        description={
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className={cn("inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold", BADGE_CLASS[status.tone])}>
-              <span aria-hidden="true" className={cn("h-1.5 w-1.5 rounded-full", DOT_CLASS[status.tone])} />
-              {status.label}
-            </span>
-            {row.name !== domain && <span>{row.name}</span>}
-            {otherDomains.length > 0 && (
-              <span className="text-soft">
-                Also <span className="num">{otherDomains.slice(0, 3).join(", ")}</span>
-                {otherDomains.length > 3 && ` and ${otherDomains.length - 3} more`}
-              </span>
-            )}
-            {host.tags.length > 0 && <TagChips tags={host.tags} />}
+  const header = (tabs: ReactNode) => (
+    <PageHeader
+      className="mb-0"
+      breadcrumb={["Traffic", { label: "Proxy hosts", href: "/proxy-hosts" }, domain]}
+      title={<span className="[overflow-wrap:anywhere]">{domain}</span>}
+      description={
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className={cn("inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold", BADGE_CLASS[status.tone])}>
+            <span aria-hidden="true" className={cn("h-1.5 w-1.5 rounded-full", DOT_CLASS[status.tone])} />
+            {status.label}
           </span>
-        }
-        actions={
-          <>
-            {url && (
-              <Button variant="outline" asChild>
-                <a href={url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink aria-hidden="true" />
-                  Open site
-                </a>
-              </Button>
-            )}
-            {allowed.write && (
-              <Button variant="outline" onClick={toggle} disabled={toggling}>
-                {host.enabled ? "Disable" : "Enable"}
-              </Button>
-            )}
-            {allowed.write && (
-              <Button asChild>
-                <Link href={hostEditorHref(host.id)}>Edit host</Link>
-              </Button>
-            )}
-          </>
-        }
-      >
-        <nav aria-label="Host sections" className="flex gap-1 overflow-x-auto border-b border-line">
-          <TabLink href={hostHref(host.id)} current>
-            Overview
-          </TabLink>
-          {allowed.write &&
-            TAB_SECTIONS.map((section) => (
-              <TabLink key={section} href={hostEditorHref(host.id, section)}>
-                {HOST_EDITOR_SECTION_LABELS[section]}
-              </TabLink>
-            ))}
-          {allowed.auditLog && (
-            <TabLink href={hostAuditHref(host.id)}>
-              History
-              {changes && changes.total > 0 && (
-                <span className="num rounded-full bg-raise px-1.5 text-[11px] leading-[18px] text-muted-foreground">{changes.total}</span>
-              )}
-            </TabLink>
+          {row.name !== domain && <span>{row.name}</span>}
+          {otherDomains.length > 0 && (
+            <span className="text-soft">
+              Also <span className="num">{otherDomains.slice(0, 3).join(", ")}</span>
+              {otherDomains.length > 3 && ` and ${otherDomains.length - 3} more`}
+            </span>
           )}
-        </nav>
-      </PageHeader>
+          {host.tags.length > 0 && <TagChips tags={host.tags} />}
+        </span>
+      }
+      actions={
+        <>
+          {url && (
+            <Button variant="outline" asChild>
+              <a href={url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink aria-hidden="true" />
+                Open site
+              </a>
+            </Button>
+          )}
+          {allowed.write && (
+            <Button variant="outline" onClick={toggle} disabled={toggling}>
+              {host.enabled ? "Disable" : "Enable"}
+            </Button>
+          )}
+        </>
+      }
+    >
+      {tabs}
+    </PageHeader>
+  );
 
+  const overview = (
+    <div className="flex min-w-0 flex-col gap-[18px]">
       {incident && host.enabled && <IncidentBanner item={incident} domains={host.domains} allowed={allowed} time={time} />}
       {host.enabled && (health.status === "down" || health.status === "degraded") && (
         <Banner tone={health.status === "down" ? "bad" : "warn"} title={health.status === "down" ? "Caddy took every upstream out of rotation." : "An upstream is failing."}>
@@ -481,7 +453,7 @@ export default function HostDetailClient({ host, detail, can: allowed }: { host:
                   </li>
                 ))}
               </ul>
-              <HealthChecks health={health} hostId={host.id} upstreams={health.upstreams.length} canWrite={allowed.write} />
+              <HealthChecks health={health} upstreams={health.upstreams.length} canWrite={allowed.write} />
             </SectionCard>
 
             {traffic && (
@@ -545,35 +517,82 @@ export default function HostDetailClient({ host, detail, can: allowed }: { host:
                       )}
                     </span>
                     {allowed.write && (
-                      <Link
-                        href={hostEditorHref(host.id, entry.section)}
+                      <a
+                        href={`#${entry.section}`}
                         aria-label={`Edit ${entry.title.toLowerCase()}`}
                         className="self-start text-[13px] text-brand underline-offset-4 hover:underline"
                       >
                         Edit
-                      </Link>
+                      </a>
                     )}
                   </li>
                 );
               })}
             </ul>
           </SectionCard>
-
-          {changes && (
-            <SectionCard title="Changes to this host" link={{ label: "History", href: hostAuditHref(host.id) }}>
-              {changes.entries.length === 0 ? (
-                <p className="m-0 px-[18px] py-3.5 text-[13px] text-soft">No changes recorded yet.</p>
-              ) : (
-                <ol className="m-0 list-none p-0">
-                  {changes.entries.map((entry) => (
-                    <ChangeEntry key={entry.id} entry={entry} time={{ relative: (v) => format.relative(v), dateTime: (v) => format.dateTime(v) }} />
-                  ))}
-                </ol>
-              )}
-            </SectionCard>
-          )}
         </div>
       </div>
+    </div>
+  );
+
+  const history =
+    allowed.auditLog && changes ? (
+      <SectionCard title="Changes to this host" count={changes.total > 0 ? changes.total : null} link={{ label: "Open in the audit log", href: hostAuditHref(host.id) }}>
+        {changes.entries.length === 0 ? (
+          <p className="m-0 px-[18px] py-3.5 text-[13px] text-soft">No changes recorded yet.</p>
+        ) : (
+          <ol className="m-0 list-none p-0">
+            {changes.entries.map((entry) => (
+              <ChangeEntry key={entry.id} entry={entry} time={{ relative: (v) => format.relative(v), dateTime: (v) => format.dateTime(v) }} />
+            ))}
+          </ol>
+        )}
+      </SectionCard>
+    ) : null;
+  const historyCount = changes ? changes.total : null;
+
+  if (editor) {
+    return <HostEditor data={editor} workspace={{ header, overview, history, historyCount }} />;
+  }
+  return <ReadOnlyHost header={header} overview={overview} history={history} historyCount={historyCount} />;
+}
+
+/** The page for a role that may not change hosts: Overview and History, switched in place. */
+function ReadOnlyHost({ header, overview, history, historyCount }: { header: (tabs: ReactNode) => ReactNode; overview: ReactNode; history: ReactNode | null; historyCount: number | null }) {
+  const [view, setView] = useState<"overview" | "history">("overview");
+  useEffect(() => {
+    const select = () => setView(window.location.hash === "#history" && history ? "history" : "overview");
+    select();
+    window.addEventListener("hashchange", select);
+    return () => window.removeEventListener("hashchange", select);
+  }, [history]);
+  const go = (next: "overview" | "history") => {
+    setView(next);
+    const url = new URL(window.location.href);
+    url.hash = next === "overview" ? "" : next;
+    window.history.replaceState(window.history.state, "", url.toString());
+  };
+  const tabs = (
+    <nav aria-label="Host sections">
+      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-line">
+        <TabAnchor id="overview" current={view === "overview"} onSelect={() => go("overview")}>
+          Overview
+        </TabAnchor>
+        {history && (
+          <TabAnchor id="history" current={view === "history"} onSelect={() => go("history")}>
+            History
+            {historyCount !== null && historyCount > 0 && (
+              <span className="num rounded-full bg-raise px-1.5 text-[11px] leading-[18px] text-muted-foreground">{historyCount}</span>
+            )}
+          </TabAnchor>
+        )}
+      </div>
+    </nav>
+  );
+  return (
+    <div className="flex min-w-0 flex-col gap-5">
+      {header(tabs)}
+      {view === "history" && history ? history : overview}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 /**
  * Saving a proxy host from the host editor (/proxy-hosts/new and
- * /proxy-hosts/[id]/edit) and previewing what saving would do.
+ * the tabs of /proxy-hosts/[id]) and previewing what saving would do.
  *
  * The editor sends the host's fields as JSON, in the shape of the REST API's
  * POST and PUT bodies: every field for a new host, the changed top-level

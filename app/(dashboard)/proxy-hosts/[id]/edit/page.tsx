@@ -1,21 +1,15 @@
-import { notFound } from "next/navigation";
-import { requirePermission } from "@/src/lib/auth";
-import { findProxyHostInScope } from "@/src/lib/access-scope";
-import { HostEditor } from "@/src/components/proxy-hosts/editor/HostEditor";
-import { loadHostEditorData } from "../../editor-data";
-import { parseRowId } from "@/src/lib/row-ids";
+import { redirect } from "next/navigation";
+import { isSectionId } from "@/src/components/proxy-hosts/editor/changes";
 
-export const metadata = { title: "Edit proxy host" };
+type PageProps = { params: Promise<{ id: string }>; searchParams: Promise<{ section?: string }> };
 
-type PageProps = { params: Promise<{ id: string }> };
-
-/** The host editor for an existing host; a host outside the role's scope is not found, as a missing one. */
-export default async function EditProxyHostPage({ params }: PageProps) {
-  const { access } = await requirePermission("proxy_hosts:write");
+/**
+ * The editor is part of the host's page now (its tabs). Old links land
+ * there: ?section=security opens that tab; an anchor (#waf) carries over,
+ * since the redirect names none.
+ */
+export default async function EditProxyHostPage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const hostId = parseRowId(id);
-  const host = hostId === null ? null : await findProxyHostInScope(access, hostId);
-  if (!host) notFound();
-  const data = await loadHostEditorData(access, { host, template: null, initialDomain: null });
-  return <HostEditor data={data} />;
+  const { section } = await searchParams;
+  redirect(`/proxy-hosts/${encodeURIComponent(id)}${section && isSectionId(section) ? `#${section}` : ""}`);
 }

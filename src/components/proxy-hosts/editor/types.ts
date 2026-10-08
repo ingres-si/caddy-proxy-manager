@@ -1,5 +1,5 @@
 /**
- * What the host editor pages (/proxy-hosts/new, /proxy-hosts/[id]/edit) pass
+ * What the host editor pages (/proxy-hosts/new, and the tabs of /proxy-hosts/[id]) pass
  * to the editor. Plain data only: every list is an allowlisted view built by
  * the page (no PEM, keys, password hashes or e-mail addresses beyond what the
  * user's role may read).

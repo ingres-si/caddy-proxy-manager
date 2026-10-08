@@ -61,7 +61,7 @@ export type EditorSection = 'Routing' | 'Security' | 'Access' | 'Certificate' | 
 
 /** Opens one section of the host editor (/proxy-hosts/new, /proxy-hosts/<id>/edit). */
 export async function openEditorSection(page: Page, section: EditorSection): Promise<void> {
-  await page.getByRole('navigation', { name: 'Host settings' }).getByRole('link', { name: new RegExp(`^${section}`) }).click();
+  await page.getByRole('tab', { name: new RegExp(`^${section}`) }).click();
   await expect(page.getByRole('heading', { level: 2, name: section, exact: true })).toBeAttached();
 }
 
@@ -71,8 +71,7 @@ export async function openEditorSection(page: Page, section: EditorSection): Pro
  * value on fast machines).
  */
 async function waitForHostEditor(page: Page): Promise<void> {
-  await expect(page.getByRole('navigation', { name: 'Host settings' })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByTestId('host-editor-bar')).toHaveAttribute('data-hydrated', 'true', { timeout: 15_000 });
+  await expect(page.locator('[data-host-tabs]')).toHaveAttribute('data-hydrated', 'true', { timeout: 15_000 });
 }
 
 /** Opens the host editor for a new host. */
@@ -81,10 +80,11 @@ export async function openNewHost(page: Page, query = ''): Promise<void> {
   await waitForHostEditor(page);
 }
 
-/** Opens the host editor of an existing host. */
+/** Opens a section of an existing host's editor: a tab of the host's page (Routing unless given). */
 export async function openHostEditor(page: Page, hostId: number, section?: EditorSection): Promise<void> {
-  await page.goto(`/proxy-hosts/${hostId}/edit${section ? `#${section.toLowerCase()}` : ''}`);
+  await page.goto(`/proxy-hosts/${hostId}#${(section ?? 'Routing').toLowerCase()}`);
   await waitForHostEditor(page);
+  await expect(page.getByRole('tab', { name: new RegExp(`^${section ?? 'Routing'}`) })).toHaveAttribute('aria-selected', 'true');
 }
 
 /** Adds domains in the Domains card (one per line, or comma separated). */

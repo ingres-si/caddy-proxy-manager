@@ -25,18 +25,19 @@ Select hosts with the checkboxes to act on several at once: turn WAF blocking on
 
 The row menu opens the host, edits or duplicates it, enables or disables it, or deletes it.
 
-Links that open the list with something prepared: `/proxy-hosts?search=<text>`, `?create=1` (with `&domain=<domain>`) opens the create form, and `?edit=<id>` the edit form of a host.
+Links that open the list with something prepared: `/proxy-hosts?search=<text>`, `?create=1` (with `&domain=<domain>`) opens a new host, and `?edit=<id>` a host's page at Routing.
 
 ## A host's page
 
-Select a host's domain to open its page. It shows:
+Select a host's domain to open its page. Its tabs are **Overview**, the sections of the [host editor](proxy-host-editor.md) (for roles that may change hosts) and **History**; they switch in place, so looking at a host and changing it happen on one page. The overview shows:
 
 - **What needs attention**: a 5xx burst (when it happened, how many responses, the most frequent request), unusual blocked traffic, a certificate problem, an upstream Caddy took out of rotation, or a change waiting for approval, with links to the matching requests, alerts or pages.
 - **Last 24 hours**: requests, 5xx responses and their share, distinct clients and bandwidth, a chart of served and 5xx responses per 30 minutes, and the 5xx share per 30 minutes. When an error-rate alert rule watches the host, its threshold is drawn on that line (shown to users with `alerts:read`).
-- **Upstreams**: each upstream with what Caddy reports about it, and the host's health check settings. Without health checks the page says so, and **Turn on health checks** opens the editor with passive health checks on (failures remembered for 30 seconds) as an unsaved change to review and save.
+- **Upstreams**: each upstream with what Caddy reports about it, and the host's health check settings. Without health checks the page says so, and **Turn on health checks** opens the Routing tab with passive health checks on (failures remembered for 30 seconds) as an unsaved change to review and save.
 - **Where requests go**: the busiest paths with their 5xx responses, and the status codes.
-- **Configuration**: one line per section of the host editor (routing, security, access, certificate, headers, and advanced settings when any are set), each with a link to edit it.
-- **Changes to this host**: the latest audit log entries about the host (with `audit_log:read`), with the fields each change made when [configuration history](../ee/docs/config-history.md) kept the versions around it, and a link to roll back (with `config_history:restore`).
+- **Configuration**: one line per section of the host editor (routing, security, access, certificate, headers, and advanced settings when any are set), each with **Edit**, which opens that tab.
+
+The **History** tab lists the latest audit log entries about the host (with `audit_log:read`), with the fields each change made when [configuration history](../ee/docs/config-history.md) kept the versions around it, and a link to roll back (with `config_history:restore`).
 
 The page needs `proxy_hosts:read`. A host outside your role's tags answers "not found", as a host that does not exist.
 

@@ -234,11 +234,12 @@ describe('host page', () => {
     expect(html).toContain('href="/proxy-hosts"');
     expect(html).toContain('href="https://email.example.com"');
     expect(html).toContain('Open site');
-    expect(html).toContain('href="/proxy-hosts/2/edit"');
-    expect(html).toContain('Edit host');
+    // One page: no separate editor to open, the tabs switch in place.
+    expect(html).not.toContain('Edit host');
+    expect(html).not.toContain('/edit');
     expect(html).toContain('aria-label="Host sections"');
-    expect(html).toContain('href="/proxy-hosts/2/edit?section=routing"');
-    expect(html).toContain('href="/audit-log?entityType=proxy_host&amp;entityId=2"');
+    expect(html).toMatch(/<a href="#overview" role="tab" aria-selected="true"/);
+    expect(html).toContain('href="#history"');
   });
 
   it('explains the incident and links to its requests', () => {
@@ -251,14 +252,19 @@ describe('host page', () => {
 
   it('shows traffic, upstreams, paths, configuration and changes', () => {
     const html = renderDetail();
-    for (const text of ['Last 24 hours', '2,729', '60.7 MB', 'Alert at', 'Upstreams', 'https://mailcow-nginx:443', 'TLS to upstream', 'Health checks are off', 'Turn on health checks', 'Where requests go', '143 × 501', 'closed by the client', 'Configuration', 'Edit routing', 'Changes to this host', 'Roll back', 'href="/history?version=41"']) {
+    for (const text of ['Last 24 hours', '2,729', '60.7 MB', 'Alert at', 'Upstreams', 'https://mailcow-nginx:443', 'TLS to upstream', 'Health checks are off', 'Turn on health checks', 'Where requests go', '143 × 501', 'closed by the client', 'Configuration', 'Edit routing']) {
       expect(html, text).toContain(text);
     }
+    // Editing a section and turning on health checks stay on this page.
+    expect(html).toContain('href="#routing"');
+    expect(html).toContain('href="#health-checks"');
+    // The changes are on the History tab, not the overview.
+    expect(html).not.toContain('Changes to this host');
   });
 
   it('leaves out what the reader may not use', () => {
     const html = renderDetail({ traffic: null, changes: null }, { ...ALL, write: false, analytics: false, alerts: false, auditLog: false });
-    for (const text of ['Edit host', 'Last 24 hours', 'Where requests go', 'Changes to this host', 'Turn on health checks', 'Show these requests', 'Alert history', 'section=routing']) {
+    for (const text of ['Edit routing', 'Last 24 hours', 'Where requests go', 'href="#history"', 'Turn on health checks', 'Show these requests', 'Alert history', 'Disable']) {
       expect(html, text).not.toContain(text);
     }
     expect(html).toContain('Upstreams');

@@ -28,10 +28,15 @@ vi.mock('next/navigation', () => ({
   notFound: () => { throw new Error('NOT_FOUND'); },
 }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+vi.mock('@/src/lib/upstream-health', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/src/lib/upstream-health')>()),
+  getProxyHostHealth: async () => ({ status: 'unchecked', caddyReachable: true, upstreams: [], healthChecks: { active: null, passive: null } }),
+}));
 
 import { previewProxyHostEditorAction, saveProxyHostEditorAction } from '../../app/(dashboard)/proxy-hosts/editor-actions';
 import { toEditorCertificate } from '../../app/(dashboard)/proxy-hosts/editor-data';
 import EditProxyHostPage from '../../app/(dashboard)/proxy-hosts/[id]/edit/page';
+import ProxyHostPage from '../../app/(dashboard)/proxy-hosts/[id]/page';
 import NewProxyHostPage from '../../app/(dashboard)/proxy-hosts/new/page';
 import * as createPreviewRoute from '../../app/api/v1/proxy-hosts/preview/route';
 import * as updatePreviewRoute from '../../app/api/v1/proxy-hosts/[id]/preview/route';
@@ -73,6 +78,20 @@ describe('host editor save', () => {
     expect(row).toMatchObject({ sslForced: false, hstsSubdomains: true });
     expect(result.status === 'saved' && result.hostId).toBe(row.id);
     expect(await ctx.db.select().from(schema.forwardAuthAccess)).toMatchObject([{ proxyHostId: row.id, userId: BOB }]);
+  });
+
+  it('says a host stored while Caddy is down is saved but not live yet, for a new host and for a change', async () => {
+    ctx.sessionUserId = ADMIN;
+    const { applyCaddyConfig } = await import('@/src/lib/caddy');
+    const { CaddyApplyError } = await import('@/src/lib/caddy-apply-error');
+    vi.mocked(applyCaddyConfig).mockRejectedValueOnce(new CaddyApplyError('Unable to reach Caddy API', 'CADDY_UNREACHABLE'));
+    const created = await saveProxyHostEditorAction(null, { host: { name: 'Offline', domains: ['offline.example.com'], upstreams: ['http://10.0.0.9:80'] } });
+    const row = (await first(ctx.db.select().from(schema.proxyHosts).where(eq(schema.proxyHosts.name, 'Offline')).limit(1)))!;
+    expect(created).toEqual({ status: 'saved', hostId: row.id, message: expect.stringMatching(/^Saved, but not live yet: Unable to reach Caddy API\./) });
+
+    vi.mocked(applyCaddyConfig).mockRejectedValueOnce(new CaddyApplyError('Unable to reach Caddy API', 'CADDY_UNREACHABLE'));
+    const updated = await saveProxyHostEditorAction(row.id, { host: { name: 'Offline 2' } });
+    expect(updated).toMatchObject({ status: 'saved', hostId: row.id, message: expect.stringContaining('not live yet') });
   });
 
   it('refuses a new host without a name or domains list', async () => {
@@ -176,13 +195,26 @@ describe('host editor review', () => {
 });
 
 describe('host editor pages', () => {
-  it('load the host and the approval context; a missing host is not found', async () => {
+  it('put the editor on the host\'s page for writers, with the approval context; a missing host is not found', async () => {
     ctx.sessionUserId = ALICE;
-    const page = (await EditProxyHostPage({ params: Promise.resolve({ id: String(hosts.prod) }) })) as { props: { data: Record<string, any> } };
-    expect(page.props.data).toMatchObject({ mode: 'edit', host: { id: hosts.prod, name: 'App' }, isAdmin: false, canChooseUsers: true });
-    expect(page.props.data.approval.policies).toMatchObject([{ name: 'Production' }]);
-    await expect(EditProxyHostPage({ params: Promise.resolve({ id: '9999' }) })).rejects.toThrow('NOT_FOUND');
-    await expect(EditProxyHostPage({ params: Promise.resolve({ id: 'abc' }) })).rejects.toThrow('NOT_FOUND');
+    const page = (await ProxyHostPage({ params: Promise.resolve({ id: String(hosts.prod) }) })) as { props: { editor: Record<string, any> } };
+    expect(page.props.editor).toMatchObject({ mode: 'edit', host: { id: hosts.prod, name: 'App' }, isAdmin: false, canChooseUsers: true });
+    expect(page.props.editor.approval.policies).toMatchObject([{ name: 'Production' }]);
+    await expect(ProxyHostPage({ params: Promise.resolve({ id: '9999' }) })).rejects.toThrow('NOT_FOUND');
+    await expect(ProxyHostPage({ params: Promise.resolve({ id: 'abc' }) })).rejects.toThrow('NOT_FOUND');
+  });
+
+  it('leave the editor out for roles that may only read hosts', async () => {
+    ctx.sessionUserId = DAVE;
+    const page = (await ProxyHostPage({ params: Promise.resolve({ id: String(hosts.dev) }) }).catch((error: Error) => error)) as { props?: { editor: unknown } } | Error;
+    if (page instanceof Error) expect(page.message).toMatch(/NOT_FOUND|REDIRECT/);
+    else expect(page.props?.editor).toBeNull();
+  });
+
+  it('send the old editor address to the host\'s page, at the section asked for', async () => {
+    await expect(EditProxyHostPage({ params: Promise.resolve({ id: '7' }), searchParams: Promise.resolve({ section: 'security' }) })).rejects.toThrow('REDIRECT:/proxy-hosts/7#security');
+    await expect(EditProxyHostPage({ params: Promise.resolve({ id: '7' }), searchParams: Promise.resolve({}) })).rejects.toThrow('REDIRECT:/proxy-hosts/7');
+    await expect(EditProxyHostPage({ params: Promise.resolve({ id: '7' }), searchParams: Promise.resolve({ section: 'nope' }) })).rejects.toThrow(/^REDIRECT:\/proxy-hosts\/7$/);
   });
 
   it('start a new host from ?domain= and a copy from ?from=', async () => {

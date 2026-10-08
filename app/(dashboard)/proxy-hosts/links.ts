@@ -1,6 +1,6 @@
 /**
- * Where the proxy host pages link to: a host's page, the full-page host
- * editor and its sections, the host's audit log and configuration history,
+ * Where the proxy host pages link to: a host's page and the sections of its
+ * editor (tabs of that page), the host's audit log and configuration history,
  * and its traffic on the analytics page.
  */
 import type { HostEditorSection } from "@/src/lib/proxy-host-config-summary";
@@ -12,17 +12,17 @@ export function hostHref(id: number): string {
   return `/proxy-hosts/${id}`;
 }
 
-/** The host editor, opened at `section`. */
+/** A host's page, opened at a section of its editor (Routing unless given). */
 export function hostEditorHref(id: number, section?: HostEditorSection): string {
-  return `/proxy-hosts/${id}/edit${section ? `?section=${section}` : ""}`;
+  return `/proxy-hosts/${id}#${section ?? "routing"}`;
 }
 
 /** The host editor's anchor that opens Routing with health checks turned on as an unsaved change. */
 export const HEALTH_CHECKS_TARGET = "health-checks";
 
-/** The host editor with health checks turned on as an unsaved change, to review and save. */
+/** A host's page with health checks turned on as an unsaved change in Routing, to review and save. */
 export function hostHealthChecksHref(id: number): string {
-  return `/proxy-hosts/${id}/edit#${HEALTH_CHECKS_TARGET}`;
+  return `/proxy-hosts/${id}#${HEALTH_CHECKS_TARGET}`;
 }
 
 /** The audit log filtered to the host (the filters of GET /api/v1/audit-log). */

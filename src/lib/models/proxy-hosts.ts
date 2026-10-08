@@ -1,5 +1,6 @@
 import { appDb, nowIso, toIso } from "../db";
 import { applyCaddyConfig } from "../caddy";
+import { CaddyApplyError } from "../caddy-apply-error";
 import { logAuditEvent } from "../audit";
 import {
   forwardAuthAccess,
@@ -2668,7 +2669,13 @@ export async function createProxyHost(rawInput: ProxyHostInput, actorUserId: num
     data: input
   });
 
-  await applyCaddyConfig();
+  try {
+    await applyCaddyConfig();
+  } catch (error) {
+    // The host is stored: say which one, so the caller can tell it was saved but is not live yet.
+    if (error instanceof CaddyApplyError) error.proxyHostId = record.id;
+    throw error;
+  }
   return (await getProxyHost(record.id))!;
 }
 

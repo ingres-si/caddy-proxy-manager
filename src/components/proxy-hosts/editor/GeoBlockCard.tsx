@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { COUNTRIES } from "../countries";
-import { AddButton, ChipInput, EditorCard, FieldError, RemoveButton, TextField, useEditor } from "./fields";
+import { AddButton, ChipInput, EditorCard, FieldError, RemoveButton, TextField, ToggleRow, useEditor } from "./fields";
 import { SegmentedField } from "./controls";
 import { rowKey, type GeoForm } from "./model";
 
@@ -271,10 +271,13 @@ export function GeoBlockCard() {
                   hint="private_ranges covers the private networks."
                 />
               </div>
-              <label className="flex items-start gap-2.5">
-                <Checkbox checked={geo.failClosed} onCheckedChange={(checked) => set({ failClosed: checked === true })} className="mt-0.5" />
-                <span className="text-[13px] font-medium">Block clients whose address is unknown</span>
-              </label>
+              <ToggleRow
+                id="f-geo-fail-closed"
+                className="py-0"
+                label="Block clients whose address is unknown"
+                checked={geo.failClosed}
+                onChange={(failClosed) => set({ failClosed })}
+              />
               <div className="grid grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))] gap-x-4 gap-y-3">
                 <TextField id="f-geo-status" name="geoblockResponseStatus" label="Status code" value={geo.responseStatus} onChange={(responseStatus) => set({ responseStatus })} inputMode="numeric" mono />
                 <TextField id="f-geo-body" name="geoblockResponseBody" label="Response body" value={geo.responseBody} onChange={(responseBody) => set({ responseBody })} />

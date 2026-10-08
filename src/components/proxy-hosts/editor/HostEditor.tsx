@@ -1,14 +1,20 @@
 "use client";
 
 /**
- * The sectioned host editor (/proxy-hosts/new and /proxy-hosts/[id]/edit):
- * a section list (Routing, Security, Access, Certificate, Headers, Advanced,
- * each linkable as #routing …), the settings of the chosen section, and a
- * bar at the bottom that counts unsaved changes against the saved host and
- * opens a review of exactly what will change, the approval policy that
- * applies and the impact, before the change is saved or submitted.
+ * The sectioned host editor: tabs for Routing, Security, Access,
+ * Certificate, Headers and Advanced (each linkable as #routing …), the
+ * settings of the chosen tab, and a bar at the bottom that counts unsaved
+ * changes against the saved host and opens a review of exactly what will
+ * change, the approval policy that applies and the impact, before the change
+ * is saved or submitted.
+ *
+ * On a host's page (`workspace`) the same tab bar also holds the page's
+ * Overview and History, so looking at a host and changing it happen on one
+ * page: switching tabs never leaves it, unsaved changes survive the switch,
+ * and the bar shows up only once something changed. /proxy-hosts/new uses it
+ * on its own.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ShieldCheck } from "lucide-react";
@@ -17,11 +23,11 @@ import { Banner } from "@/components/ui/Banner";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Switch } from "@/components/ui/switch";
-import { useFormat } from "@/src/components/preferences/PreferencesProvider";
 import { policiesCovering } from "@/ee/approvals/match";
 import { previewProxyHostEditorAction, saveProxyHostEditorAction } from "@/app/(dashboard)/proxy-hosts/editor-actions";
 import { changeGroups, formChanges, isSectionId, SECTION_LABELS, SECTIONS, type ChangeLookup, type FormChange, type SectionId } from "./changes";
 import { EditorProvider, type EditorContextValue } from "./fields";
+import { TabAnchor } from "./TabAnchor";
 import { HEALTH_CHECKS_TARGET } from "@/app/(dashboard)/proxy-hosts/links";
 import { buildPayload, copyHostForm, hostToForm, LB_POLICIES, newHostForm, payloadIsEmpty, serializeUpstreams, withHealthChecksOn, type HostForm } from "./model";
 import { fieldOfServerError, validateForm, type FieldErrors } from "./validate";
@@ -31,15 +37,6 @@ import { SecuritySection } from "./SecuritySection";
 import { AccessSection } from "./AccessSection";
 import { AdvancedSection, CertificateSection, HeadersSection } from "./OtherSections";
 import type { HostEditorData } from "./types";
-
-const SECTION_ICONS: Record<SectionId, string> = {
-  routing: "M8 3L4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4",
-  security: "M12 3L5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6zM9 12l2 2 4-4",
-  access: "M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4",
-  certificate: "M12 15a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM8.5 13.5L7 22l5-3 5 3-1.5-8.5",
-  headers: "M4 6h16M4 12h10M4 18h7",
-  advanced: "M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6",
-};
 
 /** Cards that can be linked to directly (#waf), and the section they are in. */
 const CARD_SECTIONS: Record<string, SectionId> = {
@@ -52,7 +49,7 @@ const CARD_SECTIONS: Record<string, SectionId> = {
   "f-waf-exclusions": "security",
   "rate-limiting": "security",
   "access-list": "access",
-  "geo-blocking": "access",
+  "geo-blocking": "security",
   "sign-in": "access",
   "f-mtls": "access",
   "f-blocks": "access",
@@ -77,12 +74,11 @@ function sectionSummary(section: SectionId, form: HostForm, data: HostEditorData
     }
     case "security": {
       const rate = form.rateLimit.enabled ? plural(form.rateLimit.rules.length, "rate limit") : "no own rate limits";
-      return `WAF ${WAF_LABELS[form.waf.mode]} · ${rate}`;
+      return `WAF ${WAF_LABELS[form.waf.mode]} · ${rate}${form.geoblock.enabled ? " · geo blocking" : ""}`;
     }
     case "access": {
       const parts = [
         form.accessListId !== null ? data.accessLists.find((list) => list.id === form.accessListId)?.name ?? "Access list" : null,
-        form.geoblock.enabled ? "Geo blocking" : null,
         form.signIn === "authentik" ? "Authentik" : form.signIn === "generic" ? "Forward auth" : form.signIn === "ingressi" ? "Sign-in" : null,
         form.mtls.enabled ? "mTLS" : null,
         form.pathBlocks.length > 0 ? plural(form.pathBlocks.length, "blocked path") : null,
@@ -112,6 +108,19 @@ function sectionSummary(section: SectionId, form: HostForm, data: HostEditorData
   }
 }
 
+/** A tab of a host's page: its overview, a section of the editor, or its history. */
+export type WorkspaceTab = "overview" | SectionId | "history";
+
+/** What a host's page puts around the editor. */
+export type HostWorkspace = {
+  /** The page header, with the tab bar to put under it. */
+  header: (tabs: ReactNode) => ReactNode;
+  overview: ReactNode;
+  /** The host's changes; null without audit_log:read (no History tab). */
+  history: ReactNode | null;
+  historyCount: number | null;
+};
+
 type Done =
   | { kind: "saved"; title: string; text: string; href: string; link: string }
   | { kind: "submitted"; title: string; text: string; href: string; link: string };
@@ -134,9 +143,8 @@ function initialForm(data: HostEditorData): HostForm {
 
 const noSubscription = () => () => {};
 
-export function HostEditor({ data }: { data: HostEditorData }) {
+export function HostEditor({ data, workspace }: { data: HostEditorData; workspace?: HostWorkspace }) {
   const router = useRouter();
-  const format = useFormat();
   // False in the server render and during hydration, true once React owns
   // the fields: text typed into them before that is reset by hydration.
   const hydrated = useSyncExternalStore(noSubscription, () => true, () => false);
@@ -144,7 +152,10 @@ export function HostEditor({ data }: { data: HostEditorData }) {
   const base = data.host ?? data.template;
   const [saved, setSaved] = useState<HostForm>(() => initialForm(data));
   const [form, setForm] = useState<HostForm>(saved);
-  const [section, setSection] = useState<SectionId>("routing");
+  // The tab shown: a host's page opens on its overview, the editor on its own on Routing.
+  const [view, setView] = useState<WorkspaceTab>(workspace ? "overview" : "routing");
+  const section: SectionId = isSectionId(view) ? view : "routing";
+  const setSection = setView;
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set());
   const [showAllErrors, setShowAllErrors] = useState(false);
   const [serverErrors, setServerErrors] = useState<FieldErrors>({});
@@ -225,7 +236,14 @@ export function HostEditor({ data }: { data: HostEditorData }) {
   // Sections are linkable: #routing, #security … (or a card id inside one), and ?section=routing ….
   const selectFromHash = useCallback(() => {
     const hash = decodeURIComponent(window.location.hash.replace(/^#/, "")) || new URLSearchParams(window.location.search).get("section") || "";
-    if (!hash) return;
+    if (!hash) {
+      if (workspace) setView("overview");
+      return;
+    }
+    if (workspace && (hash === "overview" || (hash === "history" && workspace.history))) {
+      setView(hash);
+      return;
+    }
     if (hash === HEALTH_CHECKS_TARGET) {
       // "Turn on health checks" on the host's page: they are turned on here as an unsaved change to review.
       update(withHealthChecksOn);
@@ -246,7 +264,7 @@ export function HostEditor({ data }: { data: HostEditorData }) {
       pendingFocus.current = hash;
       setFocusTick((tick) => tick + 1);
     }
-  }, [update]);
+  }, [update, workspace]);
 
   useEffect(() => {
     selectFromHash();
@@ -276,9 +294,12 @@ export function HostEditor({ data }: { data: HostEditorData }) {
     target.focus({ preventScroll: true });
   }, [section, focusTick]);
 
-  const goToSection = useCallback((next: SectionId, focusId?: string) => {
+  const goToSection = useCallback((next: WorkspaceTab, focusId?: string) => {
     setSection(next);
-    window.history.replaceState(window.history.state, "", `#${next}`);
+    // The overview is the page itself: no anchor.
+    const url = new URL(window.location.href);
+    url.hash = next === "overview" ? "" : next;
+    window.history.replaceState(window.history.state, "", url.toString());
     pendingFocus.current = focusId ?? null;
     if (focusId) setFocusTick((tick) => tick + 1);
     else requestAnimationFrame(() => sectionHeading.current?.focus());
@@ -292,6 +313,25 @@ export function HostEditor({ data }: { data: HostEditorData }) {
     };
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty, done, creating, changes.length]);
+
+  // Following a link to another page (the sidebar, a breadcrumb) with unsaved changes asks first:
+  // client-side navigation fires no beforeunload. Anchors within this page (#routing …) pass.
+  useEffect(() => {
+    if (!dirty || done || (creating && changes.length === 0)) return;
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = (event.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!link || link.target === "_blank" || link.hasAttribute("download")) return;
+      const url = new URL(link.href, window.location.href);
+      if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return;
+      if (!window.confirm("Leave this page? Your unsaved changes are lost.")) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
   }, [dirty, done, creating, changes.length]);
 
   // The review's preview: re-run whenever what would be sent changes while it is open.
@@ -416,9 +456,6 @@ export function HostEditor({ data }: { data: HostEditorData }) {
         ? "Create host"
         : "Save changes";
   const closeHref = data.host ? `/proxy-hosts/${data.host.id}` : "/proxy-hosts";
-  const confirmLeave = (event: MouseEvent) => {
-    if (dirty && !done && !(creating && changes.length === 0) && !window.confirm("Leave the editor? Your unsaved changes are lost.")) event.preventDefault();
-  };
 
   const sections: Record<SectionId, ReactNode> = {
     routing: <RoutingSection />,
@@ -434,50 +471,94 @@ export function HostEditor({ data }: { data: HostEditorData }) {
   // Said only when saving does not apply the change at once.
   const barText = covering.length > 0 && (creating || count > 0) ? (creating ? "Creating it sends a change request for approval." : "Saving sends them for approval.") : null;
 
+  const tabBar = (
+    <nav aria-label={workspace ? "Host sections" : "Host settings"} data-host-tabs="" data-hydrated={hydrated ? "true" : undefined}>
+      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-line">
+        {workspace && (
+          <TabAnchor id="overview" current={view === "overview"} onSelect={() => goToSection("overview")}>
+            Overview
+          </TabAnchor>
+        )}
+        {SECTIONS.map((id) => {
+          const changed = perSection.get(id) ?? 0;
+          const problems = errorsPerSection.get(id) ?? 0;
+          return (
+            <TabAnchor key={id} id={id} current={view === id} onSelect={() => goToSection(id)} title={sectionSummary(id, form, data)}>
+              {SECTION_LABELS[id]}
+              {problems > 0 ? (
+                <span className="num rounded-full bg-bad-tint px-1.5 text-[11px] font-semibold leading-[18px] text-bad">
+                  {problems}
+                  <span className="sr-only"> {problems === 1 ? "problem" : "problems"}</span>
+                </span>
+              ) : changed > 0 ? (
+                <span className="num rounded-full bg-brand-tint px-1.5 text-[11px] font-semibold leading-[18px] text-brand">
+                  {changed}
+                  <span className="sr-only"> unsaved {changed === 1 ? "change" : "changes"}</span>
+                </span>
+              ) : null}
+            </TabAnchor>
+          );
+        })}
+        {workspace?.history && (
+          <TabAnchor id="history" current={view === "history"} onSelect={() => goToSection("history")}>
+            History
+            {workspace.historyCount !== null && workspace.historyCount > 0 && (
+              <span className="num rounded-full bg-raise px-1.5 text-[11px] leading-[18px] text-muted-foreground">{workspace.historyCount}</span>
+            )}
+          </TabAnchor>
+        )}
+      </div>
+    </nav>
+  );
+
+  // On a host's page the bar is there only while something is unsaved, being reviewed or just saved.
+  const showBar = !workspace || count > 0 || dirty || reviewOpen || done !== null;
+
   return (
     <EditorProvider value={context}>
-      <div className="flex flex-col gap-5 pb-36 md:pb-28">
-        <PageHeader
-          className="mb-0"
-          breadcrumb={
-            data.host
-              ? [{ label: "Proxy hosts", href: "/proxy-hosts" }, { label: data.host.name, href: `/proxy-hosts/${data.host.id}` }, "Edit"]
-              : [{ label: "Proxy hosts", href: "/proxy-hosts" }, "New host"]
-          }
-          title={data.host ? `Edit ${data.host.name}` : data.template ? `Copy of ${data.template.name}` : "New proxy host"}
-          actions={
-            <>
-              <span className="flex h-[38px] items-center gap-2.5 rounded-[10px] border border-line bg-panel px-3 text-[13px]">
-                <span id="f-enabled-label" className="font-semibold">
-                  {form.enabled ? "Enabled" : "Disabled"}
+      <div className={cn("flex flex-col gap-5", showBar && "pb-36 md:pb-28")}>
+        {workspace ? (
+          workspace.header(tabBar)
+        ) : (
+          <PageHeader
+            className="mb-0"
+            breadcrumb={[{ label: "Proxy hosts", href: "/proxy-hosts" }, "New host"]}
+            title={data.template ? `Copy of ${data.template.name}` : "New proxy host"}
+            actions={
+              <>
+                <span className="flex h-[38px] items-center gap-2.5 rounded-[10px] border border-line bg-panel px-3 text-[13px]">
+                  <span id="f-enabled-label" className="font-semibold">
+                    {form.enabled ? "Enabled" : "Disabled"}
+                  </span>
+                  <Switch id="f-enabled" aria-label="Host enabled" checked={form.enabled} onCheckedChange={(enabled) => update((f) => ({ ...f, enabled }))} />
                 </span>
-                <Switch id="f-enabled" aria-label="Host enabled" checked={form.enabled} onCheckedChange={(enabled) => update((f) => ({ ...f, enabled }))} />
-              </span>
-              <Button asChild variant="outline" className="h-[38px]">
-                <Link href={closeHref} onClick={confirmLeave}>
-                  Close editor
-                </Link>
-              </Button>
-            </>
-          }
-        >
-          {(covering.length > 0 || form.tags.length > 0) && (
-            <div className="flex flex-wrap items-center gap-2">
-              {covering.length > 0 && (
-                <span className="inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-full border border-line2 px-2.5 text-xs text-muted-foreground">
-                  <ShieldCheck aria-hidden="true" className="h-3.5 w-3.5 text-warn" />
-                  {covering[0].name}
-                  {covering.length > 1 ? ` and ${covering.length - 1} more` : ""} {covering.length > 1 ? "policies" : "policy"} · changes need approval
-                </span>
-              )}
-              {form.tags.map((tag) => (
-                <span key={tag} className="num rounded bg-raise px-1.5 text-[11px] leading-[18px] text-muted-foreground">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
-        </PageHeader>
+                <Button asChild variant="outline" className="h-[38px]">
+                  <Link href={closeHref}>
+                    Cancel
+                  </Link>
+                </Button>
+              </>
+            }
+          >
+            {(covering.length > 0 || form.tags.length > 0) && (
+              <div className="flex flex-wrap items-center gap-2">
+                {covering.length > 0 && (
+                  <span className="inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-full border border-line2 px-2.5 text-xs text-muted-foreground">
+                    <ShieldCheck aria-hidden="true" className="h-3.5 w-3.5 text-warn" />
+                    {covering[0].name}
+                    {covering.length > 1 ? ` and ${covering.length - 1} more` : ""} {covering.length > 1 ? "policies" : "policy"} · changes need approval
+                  </span>
+                )}
+                {form.tags.map((tag) => (
+                  <span key={tag} className="num rounded bg-raise px-1.5 text-[11px] leading-[18px] text-muted-foreground">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+            {tabBar}
+          </PageHeader>
+        )}
 
         {data.template && (
           <Banner tone="info" title={`A copy of ${data.template.name}.`}>
@@ -487,79 +568,31 @@ export function HostEditor({ data }: { data: HostEditorData }) {
           </Banner>
         )}
 
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
-          <nav aria-label="Host settings" className="lg:w-[240px] lg:shrink-0">
-            <ul className="m-0 flex list-none gap-1 overflow-x-auto p-0 pb-1 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0">
-              {SECTIONS.map((id) => {
-                const current = section === id;
-                const changed = perSection.get(id) ?? 0;
-                const problems = errorsPerSection.get(id) ?? 0;
-                return (
-                  <li key={id} className="shrink-0">
-                    <a
-                      href={`#${id}`}
-                      aria-current={current ? "true" : undefined}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        goToSection(id);
-                      }}
-                      className={cn(
-                        "flex items-start gap-2.5 rounded-[10px] px-2.5 py-2 text-left no-underline transition-colors",
-                        current ? "bg-brand-tint text-foreground" : "text-muted-foreground hover:bg-panel2 hover:text-foreground"
-                      )}
-                    >
-                      <svg aria-hidden="true" viewBox="0 0 24 24" className="mt-px h-[18px] w-[18px] shrink-0 fill-none stroke-current" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                        <path d={SECTION_ICONS[id]} />
-                      </svg>
-                      <span className="flex min-w-0 flex-col gap-px">
-                        <span className={cn("flex items-center gap-2 whitespace-nowrap", current ? "font-semibold" : "font-medium")}>
-                          {SECTION_LABELS[id]}
-                          {changed > 0 && <span className="num rounded-full bg-brand-tint px-1.5 text-[11px] font-semibold leading-[18px] text-brand">{plural(changed, "change")}</span>}
-                          {problems > 0 && <span className="num rounded-full bg-bad-tint px-1.5 text-[11px] font-semibold leading-[18px] text-bad">{plural(problems, "problem")}</span>}
-                        </span>
-                        <span className="hidden max-w-[200px] truncate text-xs leading-4 text-soft lg:block">{sectionSummary(id, form, data)}</span>
-                      </span>
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
-            {data.lastSaved && (
-              <div className="mt-3 hidden flex-col gap-1 border-t border-line px-2.5 pt-3 text-xs text-soft lg:flex">
-                <span>
-                  Last saved{" "}
-                  <time dateTime={data.lastSaved.at} suppressHydrationWarning>
-                    {format.dateTime(data.lastSaved.at)}
-                  </time>
-                  {data.lastSaved.by && (
-                    <>
-                      {" "}
-                      by <span className="text-muted-foreground">{data.lastSaved.by}</span>
-                    </>
-                  )}
-                </span>
-                {data.historyHref && (
-                  <Link href={data.historyHref} className="text-brand no-underline hover:underline">
-                    History of this host
-                  </Link>
-                )}
-              </div>
-            )}
-          </nav>
+        {workspace && covering.length > 0 && isSectionId(view) && (
+          <Banner tone="info" icon={null} title={`Changes to this host need approval (${covering.map((policy) => policy.name).join(", ")}).`}>
+            Saving sends them as a change request.
+          </Banner>
+        )}
 
-          <div className="flex min-w-0 flex-1 flex-col gap-5" id="host-editor-section">
+        {view === "overview" && workspace ? (
+          workspace.overview
+        ) : view === "history" && workspace?.history ? (
+          workspace.history
+        ) : (
+          <div className="flex min-w-0 flex-col gap-5" id="host-editor-section" role="tabpanel">
             <h2 ref={sectionHeading} tabIndex={-1} className="sr-only">
               {SECTION_LABELS[section]}
             </h2>
             {sections[section]}
           </div>
-        </div>
+        )}
       </div>
 
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}
       </p>
 
+      {showBar && (
       <div className="fixed inset-x-3 bottom-[calc(68px_+_env(safe-area-inset-bottom))] z-30 flex flex-col gap-2 md:bottom-4 md:left-[calc(15.5rem_+_max(2rem,_(100vw_-_15.5rem_-_1600px)_/_2_+_2rem))] md:right-[max(2rem,_calc((100vw_-_15.5rem_-_1600px)_/_2_+_2rem))]">
         {reviewOpen && (
           <ReviewPanel
@@ -605,9 +638,22 @@ export function HostEditor({ data }: { data: HostEditorData }) {
                 <Button type="button" variant="ghost" onClick={() => setDone(null)}>
                   Keep editing
                 </Button>
-                <Button asChild variant="secondary">
-                  <Link href={done.href}>{done.link}</Link>
-                </Button>
+                {workspace && done.kind === "saved" && done.href.startsWith("/proxy-hosts/") ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setDone(null);
+                      goToSection("overview");
+                    }}
+                  >
+                    Show overview
+                  </Button>
+                ) : (
+                  <Button asChild variant="secondary">
+                    <Link href={done.href}>{done.link}</Link>
+                  </Button>
+                )}
               </span>
             </>
           ) : (
@@ -673,6 +719,7 @@ export function HostEditor({ data }: { data: HostEditorData }) {
           )}
         </div>
       </div>
+      )}
     </EditorProvider>
   );
 }

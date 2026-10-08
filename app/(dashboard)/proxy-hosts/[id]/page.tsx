@@ -5,6 +5,7 @@ import { findProxyHostInScope } from "@/src/lib/access-scope";
 import { getAccessList } from "@/src/lib/models/access-lists";
 import { loadHostDetail } from "@/src/lib/proxy-host-detail";
 import HostDetailClient from "./HostDetailClient";
+import { loadHostEditorData } from "../editor-data";
 import { parseRowId } from "@/src/lib/row-ids";
 
 export const metadata = { title: "Proxy host" };
@@ -19,16 +20,21 @@ export default async function ProxyHostPage({ params }: { params: Promise<{ id: 
 
   // The host's own access list is named, as in the host form's picker.
   const accessList = host.accessListId !== null ? await getAccessList(host.accessListId).catch(() => null) : null;
-  const detail = await loadHostDetail(access, host, {
-    accessListNames: accessList ? new Map([[accessList.id, accessList.name]]) : undefined,
-  });
+  const canWrite = can(access, "proxy_hosts:write");
+  const [detail, editor] = await Promise.all([
+    loadHostDetail(access, host, {
+      accessListNames: accessList ? new Map([[accessList.id, accessList.name]]) : undefined,
+    }),
+    // Roles that may change hosts get the editor's sections as tabs of this page.
+    canWrite ? loadHostEditorData(access, { host, template: null, initialDomain: null }) : Promise.resolve(null),
+  ]);
 
   return (
     <HostDetailClient
       host={{ id: host.id, name: host.name, domains: host.domains, enabled: host.enabled, tags: host.tags }}
       detail={detail}
       can={{
-        write: can(access, "proxy_hosts:write"),
+        write: canWrite,
         analytics: can(access, "analytics:read"),
         alerts: can(access, "alerts:read"),
         certificates: can(access, "certificates:read"),
@@ -36,6 +42,7 @@ export default async function ProxyHostPage({ params }: { params: Promise<{ id: 
         approvals: can(access, "approvals:read"),
         security: can(access, "waf:read"),
       }}
+      editor={editor}
     />
   );
 }

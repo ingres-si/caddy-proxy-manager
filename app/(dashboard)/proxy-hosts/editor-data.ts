@@ -1,6 +1,6 @@
 /**
  * The data of the host editor pages (/proxy-hosts/new and
- * /proxy-hosts/[id]/edit): the host, the pickers its role may use and the
+ * the tabs of /proxy-hosts/[id]): the host, the pickers its role may use and the
  * context the review shows. Every list is reduced to the fields the editor
  * needs; nothing secret (PEM, keys, password hashes) reaches the client.
  */

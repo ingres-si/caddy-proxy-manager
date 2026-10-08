@@ -133,19 +133,25 @@ function inEditor(element: ReactElement, editorData: HostEditorData = data()): s
 }
 
 describe('host editor page', () => {
-  it('renders the frame: breadcrumb, linkable sections, the bar', () => {
-    const html = renderToStaticMarkup(createElement(HostEditor, { data: data() }));
-    expect(html).toContain('Edit App');
-    expect(html).toContain('href="/proxy-hosts/7"');
-    expect(html).toContain('aria-label="Host settings"');
-    for (const section of ['routing', 'security', 'access', 'certificate', 'headers', 'advanced']) {
-      expect(html).toContain(`href="#${section}"`);
+  it('on a host\'s page: one tab bar with Overview, the sections and History, opening on the overview without a bar', () => {
+    const workspace = {
+      header: (tabs: unknown) => createElement('header', { 'data-testid': 'page-header' }, tabs as never),
+      overview: createElement('p', null, 'The overview'),
+      history: createElement('p', null, 'The history'),
+      historyCount: 4,
+    };
+    const html = renderToStaticMarkup(createElement(HostEditor, { data: data(), workspace }));
+    expect(html).toContain('data-testid="page-header"');
+    expect(html).toContain('aria-label="Host sections"');
+    for (const tab of ['overview', 'routing', 'security', 'access', 'certificate', 'headers', 'advanced', 'history']) {
+      expect(html).toContain(`href="#${tab}"`);
     }
-    expect(html).toMatch(/<a href="#routing" aria-current="true"/);
-    expect(html).toContain('data-testid="host-editor-bar"');
-    expect(html).toContain('No unsaved changes');
-    expect(html).toContain('aria-label="Host enabled"');
-    expect(html).toContain('History of this host');
+    expect(html).toMatch(/<a href="#overview" role="tab" aria-selected="true"/);
+    expect(html).toContain('The overview');
+    expect(html).not.toContain('The history');
+    // Nothing changed: no bar, and no editor-only header (the page has its own).
+    expect(html).not.toContain('data-testid="host-editor-bar"');
+    expect(html).not.toContain('Edit App');
   });
 
   it('asks for a new host’s name in Routing and starts from ?domain=', () => {
@@ -154,6 +160,11 @@ describe('host editor page', () => {
     expect(html).toContain('<label for="f-name"');
     expect(html).toContain('new.example.com');
     expect(html).toContain('>Create host<');
+    // The same tab bar, without Overview and History, and the bar from the start.
+    expect(html).toContain('aria-label="Host settings"');
+    expect(html).toMatch(/<a href="#routing" role="tab" aria-selected="true"/);
+    expect(html).not.toContain('href="#overview"');
+    expect(html).toContain('data-testid="host-editor-bar"');
   });
 });
 

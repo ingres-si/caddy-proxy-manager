@@ -202,7 +202,6 @@ Every guard of a route, page or server action and the permission it checks. Rout
 | `app/(dashboard)/l4-proxy-hosts/page.tsx` | `L4ProxyHostsPage` | `l4_proxy_hosts:read` |
 | `app/(dashboard)/ldap/page.tsx` | `LdapPage` | `ldap:read` |
 | `app/(dashboard)/oauth-providers/page.tsx` | `OAuthProvidersPage` | `settings:read` |
-| `app/(dashboard)/proxy-hosts/[id]/edit/page.tsx` | `EditProxyHostPage` | `proxy_hosts:write` |
 | `app/(dashboard)/proxy-hosts/[id]/page.tsx` | `ProxyHostPage` | `proxy_hosts:read` |
 | `app/(dashboard)/proxy-hosts/defaults/page.tsx` | `HostDefaultsPage` | `settings:read` |
 | `app/(dashboard)/proxy-hosts/actions.ts` | `createProxyHostAction` | `proxy_hosts:write` |

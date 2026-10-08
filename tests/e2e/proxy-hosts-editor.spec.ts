@@ -1,5 +1,5 @@
 /**
- * The host editor (/proxy-hosts/new, /proxy-hosts/<id>/edit): creating a
+ * The host editor (/proxy-hosts/new, and the tabs of /proxy-hosts/<id>): creating a
  * host, sections linkable by #anchor, unsaved-change tracking with the
  * review (diff, approval policy, impact) and undo, inline checks, copies,
  * the old ?create=1 deep link, and the regressions the old host dialog had
@@ -77,26 +77,28 @@ test.describe('Proxy host editor', () => {
 
     await addDomains(page, 'bad_domain!');
     await expect(page.getByText(/bad_domain! is not a valid domain/)).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Host settings' }).getByRole('link', { name: /^Routing/ })).toContainText(/problem/);
+    await expect(page.getByRole('tab', { name: /^Routing/ })).toContainText(/problem/);
   });
 
   test('sections are linkable and switch the form', async ({ page }) => {
     const host = await createHost(page, { name: 'Anchor Host', domains: ['anchor.local'], upstreams: ['localhost:9981'] });
     try {
       await openHostEditor(page, host.id, 'Security');
-      const nav = page.getByRole('navigation', { name: 'Host settings' });
-      await expect(nav.getByRole('link', { name: /^Security/ })).toHaveAttribute('aria-current', 'true');
       await expect(page.getByRole('heading', { name: 'Web application firewall' })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Rate limiting' })).toBeVisible();
+      // Geo blocking is part of Security, as on the host's overview.
+      await expect(page.getByRole('heading', { name: 'Geo blocking' })).toBeVisible();
 
-      await nav.getByRole('link', { name: /^Certificate/ }).click();
-      await expect(page).toHaveURL(/#certificate$/);
+      // Tabs switch in place: the page and its header stay.
+      await page.getByRole('tab', { name: /^Certificate/ }).click();
+      await expect(page).toHaveURL(new RegExp(`/proxy-hosts/${host.id}#certificate$`));
       await expect(page.getByRole('combobox', { name: 'Certificate', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1, name: 'anchor.local' })).toBeVisible();
 
-      // The host page links to sections with ?section=; the address then carries the #anchor.
+      // The old editor address leads to the host's page at the section asked for.
       await page.goto(`/proxy-hosts/${host.id}/edit?section=access`);
-      await expect(nav.getByRole('link', { name: /^Access/ })).toHaveAttribute('aria-current', 'true');
-      await expect(page).toHaveURL(new RegExp(`/proxy-hosts/${host.id}/edit#access$`));
+      await expect(page).toHaveURL(new RegExp(`/proxy-hosts/${host.id}#access$`));
+      await expect(page.getByRole('tab', { name: /^Access/ })).toHaveAttribute('aria-selected', 'true');
       await expect(page.getByRole('combobox', { name: 'Access list', exact: true })).toBeVisible();
     } finally {
       await deleteHost(page, host.id);
@@ -108,13 +110,14 @@ test.describe('Proxy host editor', () => {
     try {
       await openHostEditor(page, host.id);
       const bar = page.getByTestId('host-editor-bar');
-      await expect(bar).toContainText('No unsaved changes');
+      // Nothing changed: no bar on the host's page.
+      await expect(bar).toHaveCount(0);
 
       await setEditorSwitch(page, 'WebSockets', false);
       await openEditorSection(page, 'Headers');
       await setEditorSwitch(page, 'Send the HSTS header', false);
       await expect(bar).toContainText('2 unsaved changes');
-      await expect(page.getByRole('navigation', { name: 'Host settings' }).getByRole('link', { name: /^Headers/ })).toContainText('1 change');
+      await expect(page.getByRole('tab', { name: /^Headers/ })).toContainText('1 unsaved change');
 
       await bar.getByRole('button', { name: 'Review changes' }).click();
       // Its name follows the count: "Review 2 changes to …", then "Review 1 change to …" after an undo.
@@ -138,7 +141,7 @@ test.describe('Proxy host editor', () => {
       await setEditorSwitch(page, 'Preserve Host header', false);
       await expect(bar).toContainText('1 unsaved change');
       await bar.getByRole('button', { name: 'Discard' }).click();
-      await expect(bar).toContainText('No unsaved changes');
+      await expect(bar).toHaveCount(0);
       await expect(page.getByRole('switch', { name: 'Preserve Host header' })).toHaveAttribute('aria-checked', 'true');
     } finally {
       await deleteHost(page, host.id);
@@ -290,8 +293,11 @@ test.describe('Proxy host editor', () => {
       await openHostEditor(page, host.id);
       await setEditorSwitch(page, 'WebSockets', false);
       page.once('dialog', (dialog) => dialog.dismiss());
-      await page.getByRole('link', { name: 'Close editor' }).click();
-      await expect(page).toHaveURL(new RegExp(`/proxy-hosts/${host.id}/edit`));
+      await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Audit log' }).click();
+      await expect(page).toHaveURL(new RegExp(`/proxy-hosts/${host.id}#routing$`));
+      // Switching tabs keeps the change.
+      await page.getByRole('tab', { name: /^Overview/ }).click();
+      await expect(page.getByTestId('host-editor-bar')).toContainText('1 unsaved change');
     } finally {
       await deleteHost(page, host.id);
     }

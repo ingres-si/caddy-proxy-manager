@@ -314,7 +314,7 @@ export function changeGroups(mode: "create" | "edit"): ChangeGroup[] {
       lines: (f, lookup) => [f.accessListId === null ? "None" : lookup.accessList(f.accessListId)],
       restore: keys("accessListId"),
     },
-    { id: "geoblock", section: "access", label: "Geo blocking", focus: "f-geo-enabled", kind: "list", value: (f) => f.geoblock, lines: geoLines, restore: keys("geoblock") },
+    { id: "geoblock", section: "security", label: "Geo blocking", focus: "f-geo-enabled", kind: "list", value: (f) => f.geoblock, lines: geoLines, restore: keys("geoblock") },
     {
       id: "signIn",
       section: "access",

@@ -8,6 +8,8 @@ export type CaddyApplyErrorCode =
 
 export class CaddyApplyError extends Error {
   readonly code: CaddyApplyErrorCode;
+  /** The proxy host a create stored before the apply failed (createProxyHost), so callers can say it was saved. */
+  proxyHostId?: number;
 
   constructor(message: string, code: CaddyApplyErrorCode) {
     super(message);

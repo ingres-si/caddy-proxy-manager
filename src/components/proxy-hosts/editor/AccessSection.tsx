@@ -9,7 +9,6 @@ import { Switch } from "@/components/ui/switch";
 import { useBranding } from "@/ee/white-label/ui/BrandingProvider";
 import { AddButton, EditorCard, FieldError, RemoveButton, TextField, ToggleRow, WasHint, useEditor, useFieldProps } from "./fields";
 import { NativeSelect, SegmentedField, SelectField } from "./controls";
-import { GeoBlockCard } from "./GeoBlockCard";
 import { MtlsAccessRules } from "./MtlsAccessRules";
 import { AUTHELIA_ENDPOINT, AUTHELIA_HEADERS, PATH_BLOCK_STATUSES, rowKey, type GenericAuthForm, type SignIn } from "./model";
 import type { PathBlockStatusCode } from "@/lib/models/proxy-hosts";
@@ -199,13 +198,14 @@ function AuthentikSignIn() {
         <TextField id="f-ak-proxies" label="Trusted proxies" value={a.trustedProxies} onChange={(trustedProxies) => set({ trustedProxies })} placeholder="private_ranges" mono />
       </div>
       <PathsFields prefix="f-ak" protectedPaths={a.protectedPaths} excludedPaths={a.excludedPaths} onChange={set} />
-      <label className="flex items-start gap-2.5">
-        <Checkbox checked={a.setHostHeader} onCheckedChange={(checked) => set({ setHostHeader: checked === true })} className="mt-0.5" />
-        <span className="flex flex-col gap-0.5">
-          <span className="text-[13px] font-medium">Send the outpost domain as its Host header</span>
-          <span className="text-xs text-soft">Keep on unless the outpost is reached by address.</span>
-        </span>
-      </label>
+      <ToggleRow
+        id="f-ak-host-header"
+        className="py-0"
+        label="Send the outpost domain as its Host header"
+        description="Keep on unless the outpost is reached by address."
+        checked={a.setHostHeader}
+        onChange={(setHostHeader) => set({ setHostHeader })}
+      />
     </div>
   );
 }
@@ -492,7 +492,6 @@ export function AccessSection() {
   return (
     <>
       <AccessListCard />
-      <GeoBlockCard />
       <SignInCard />
       <MtlsCard />
       <BlockedPathsCard />

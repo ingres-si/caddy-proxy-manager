@@ -8,6 +8,7 @@ Pull the new images and recreate the containers with `docker compose pull && doc
 - **Needs attention lists alerts.** Server errors there are alerts of the built-in Error rate rule now, which resolve when the error rate is back to normal; mitigation spikes and blocked-traffic concentrations are no longer listed (sign-in redirects no longer count as blocked traffic in them anywhere). Certificate, Caddy and backup items appear as alerts for readers of the alerts while the matching rule is enabled.
 - **Dismissing from Needs attention dismisses the alert for everyone** until it resolves (`POST /api/v1/alert-silences`). The per-account dismissals of v2.2.0 and `/api/v1/overview/attention/dismissals` are removed; the migration drops the `attention_dismissals` table.
 - **The Alerts page** has the tabs Open, History, Rules and Channels. The AI provider and analytics questions moved to **AI settings** (`/settings/ai`), the daily digest to the Channels tab; `/alerts?tab=ai` redirects.
+- **A proxy host's page holds its editor.** Overview, Routing, Security, Access, Certificate, Headers, Advanced and History are tabs of `/proxy-hosts/<id>` that switch in place; `/proxy-hosts/<id>/edit` leads there. Geo blocking moved from Access to Security.
 - One database migration runs on start.
 
 ## Upgrading to v2.2.0
