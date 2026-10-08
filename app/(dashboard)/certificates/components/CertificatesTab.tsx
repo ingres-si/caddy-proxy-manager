@@ -334,7 +334,7 @@ function CertificateTableRow({
     <TableRow id={rowDomId(row.id)} className={cn(selected && "bg-brand-tint hover:bg-brand-tint", !row.active && "text-muted-foreground")}>
       <th scope="row" className="max-w-[320px] px-3 py-2.5 text-left align-middle font-normal first:pl-4">
         <span className="flex min-w-0 flex-col">
-          <span className="num truncate font-semibold text-foreground" title={row.domains.join(", ")}>
+          <span className="truncate font-semibold text-foreground" title={row.domains.join(", ")}>
             {label}
             {more > 0 && <span className="ml-1.5 font-normal text-soft">+{more}</span>}
           </span>
@@ -406,7 +406,7 @@ function CertificateCard({
       )}
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="num truncate font-semibold text-foreground" title={row.domains.join(", ")}>
+        <span className="truncate font-semibold text-foreground" title={row.domains.join(", ")}>
           {label}
           {more > 0 && <span className="ml-1.5 font-normal text-soft">+{more}</span>}
         </span>

@@ -94,7 +94,7 @@ export function CertificateSummary({ certificate }: { certificate: HostCertifica
   return (
     <span className="flex flex-col">
       <span className={TONE_TEXT[tone]}>{headline}</span>
-      <span className="text-xs text-soft">
+      <span className="whitespace-nowrap text-xs text-soft">
         {parts.join(" · ")}
         {renewal && <span className={cn(certificate.renewal === "overdue" ? "text-bad" : "text-warn")}> · {renewal}</span>}
       </span>

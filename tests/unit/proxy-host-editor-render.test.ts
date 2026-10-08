@@ -183,7 +183,11 @@ describe('host editor sections', () => {
 
   it('Security: the WAF mode, the host’s exclusions and rate limiting', () => {
     const html = inEditor(createElement(SecuritySection));
-    expect(html).toMatch(/aria-pressed="true"[^>]*>.*?Block/s);
+    // The mode is a radio group of cards, like the WAF settings' global mode; the host blocks.
+    expect(html).toContain('role="radiogroup" aria-labelledby="f-waf-mode-label"');
+    expect(html).toMatch(/role="radio" aria-checked="true"[^>]*>(?:(?!role="radio").)*?Block/s);
+    // Geo blocking is part of Security.
+    expect(html).toContain('Geo blocking');
     // Global mode names the mode the WAF settings give it today.
     expect(html).toContain('Currently blocking.');
     expect(html).toContain('Restricted SQL Character Anomaly Detection (args)');

@@ -9,7 +9,7 @@ test.describe('Analytics', () => {
   test('loads without redirecting to login', async ({ page }) => {
     await page.goto('/analytics');
     await expect(page).not.toHaveURL(/login/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Traffic analytics' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Analytics', exact: true })).toBeVisible();
   });
 
   test('shows the headline tiles, chart and request log', async ({ page }) => {

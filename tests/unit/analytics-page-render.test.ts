@@ -40,7 +40,7 @@ const pressed = (html: string, label: string) => new RegExp(`aria-pressed="true"
 describe('first paint', () => {
   it('shows the header, filters, chart frame, top lists and request log', () => {
     const html = render('');
-    expect(html).toContain('>Traffic analytics</h1>');
+    expect(html).toContain('>Analytics</h1>');
     expect(html).toContain('aria-label="Breadcrumb"');
     expect(html).toContain('aria-label="Time range"');
     expect(pressed(html, '24h')).toBe(true);

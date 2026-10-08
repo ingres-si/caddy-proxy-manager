@@ -14,7 +14,11 @@ export default async function AiSettingsPage() {
   const [settings, questions] = await Promise.all([getAiSettingsView(), getQuestionSettings()]);
   return (
     <div className="flex w-full min-w-0 flex-col gap-5">
-      <PageHeader className="mb-0" breadcrumb={["Settings", "AI"]} title="AI settings" />
+      <PageHeader
+        className="mb-0"
+        breadcrumb={[can(access, "settings:read") ? { label: "Settings", href: "/settings" } : "Settings", "AI"]}
+        title="AI settings"
+      />
       <AiSettings settings={settings} questions={questions} canWrite={can(access, "ai:write")} />
     </div>
   );

@@ -374,7 +374,7 @@ export default function AnalyticsClient({
   const header = (
     <PageHeader
       breadcrumb={["Observe", "Analytics"]}
-      title="Traffic analytics"
+      title="Analytics"
       className="mb-0"
       actions={
         disabled ? undefined : (

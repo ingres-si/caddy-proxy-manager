@@ -21,7 +21,7 @@ function trackPageErrors(page: Page): string[] {
 }
 
 async function pageShellRendered(page: Page) {
-  await expect(page.getByRole('heading', { level: 1, name: 'Traffic analytics' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'Analytics' })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('group', { name: 'Time range' }).getByRole('button', { name: '24h' })).toBeVisible();
 }
 

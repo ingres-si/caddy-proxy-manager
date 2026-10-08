@@ -351,7 +351,7 @@ export default function FleetClient({
               </>
             }
           >
-            <span className="num font-semibold [overflow-wrap:anywhere]">{instance.name}</span>
+            <span className="font-semibold [overflow-wrap:anywhere]">{instance.name}</span>
           </Cell>
         </td>
         <td className={TD}>

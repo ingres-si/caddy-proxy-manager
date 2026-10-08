@@ -522,7 +522,7 @@ export function HostEditor({ data, workspace }: { data: HostEditorData; workspac
         ) : (
           <PageHeader
             className="mb-0"
-            breadcrumb={[{ label: "Proxy hosts", href: "/proxy-hosts" }, "New host"]}
+            breadcrumb={["Traffic", { label: "Proxy hosts", href: "/proxy-hosts" }, "New host"]}
             title={data.template ? `Copy of ${data.template.name}` : "New proxy host"}
             actions={
               <>

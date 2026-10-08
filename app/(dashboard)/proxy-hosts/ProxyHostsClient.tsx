@@ -179,7 +179,8 @@ function HostName({ row }: { row: HostListRow }) {
             <span aria-hidden="true">·</span>
           </>
         )}
-        <span className="num [overflow-wrap:anywhere]">
+        {/* One line: a long upstream is cut, its full address in the tooltip. */}
+        <span className="num max-w-[300px] truncate" title={row.upstreams.join("\n")}>
           {row.upstreams[0]}
           {row.upstreams.length > 1 && ` +${row.upstreams.length - 1}`}
         </span>
@@ -233,6 +234,10 @@ export default function ProxyHostsClient({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showTraffic = analyticsStatus !== null && analyticsStatus !== "disabled";
+
+  // The Tags column only when some host has tags.
+
+  const showTags = availableTags.length > 0 || rows.some((row) => row.tags.length > 0);
   const hostById = useMemo(() => new Map(hosts.map((host) => [host.id, host])), [hosts]);
 
   useEffect(() => {
@@ -637,7 +642,7 @@ export default function ProxyHostsClient({
                         {showTraffic && <SortHeader label="5xx" sortKey="errors" query={query} onSort={handleSort} className="text-right" />}
                         <PlainHeader>Protection</PlainHeader>
                         <PlainHeader>Certificate</PlainHeader>
-                        <PlainHeader>Tags</PlainHeader>
+                        {showTags && <PlainHeader>Tags</PlainHeader>}
                         <th scope="col" className="border-b border-line py-2 pl-1.5 pr-[18px]">
                           <span className="sr-only">Actions</span>
                         </th>
@@ -683,12 +688,14 @@ export default function ProxyHostsClient({
                             <td className="px-2.5 py-3">
                               <ProtectionPills protections={row.protections} />
                             </td>
-                            <td className="px-2.5 py-3">
+                            <td className="whitespace-nowrap px-2.5 py-3">
                               <CertificateSummary certificate={row.certificate} />
                             </td>
-                            <td className="px-2.5 py-3">
-                              <TagChips tags={row.tags} onSelect={(tag) => !query.tags.includes(tag) && toggleTag(tag)} />
-                            </td>
+                            {showTags && (
+                              <td className="px-2.5 py-3">
+                                <TagChips tags={row.tags} onSelect={(tag) => !query.tags.includes(tag) && toggleTag(tag)} />
+                              </td>
+                            )}
                             <td className="py-2.5 pl-1.5 pr-[18px] text-right">{actionsMenu(row)}</td>
                           </tr>
                         );

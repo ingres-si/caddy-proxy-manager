@@ -15,7 +15,7 @@ const SAME_ORIGIN = { Origin: ORIGIN };
 test.describe('Analytics questions', () => {
   test('shows the Ask box read-only without an AI provider', async ({ page }) => {
     await page.goto('/analytics');
-    await expect(page.getByRole('heading', { name: 'Traffic analytics', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Analytics', level: 1 })).toBeVisible();
     test.skip(await page.getByTestId('analytics-disabled').isVisible(), 'ClickHouse is not configured on this stack');
     const ask = page.getByRole('region', { name: 'Ask about your traffic' });
     await expect(ask).toBeVisible();

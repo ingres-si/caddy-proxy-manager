@@ -13,6 +13,7 @@ import { AddButton, EditorCard, Field, FieldError, RemoveButton, TextField, Togg
 import { NativeSelect, SegmentedField, SelectField } from "./controls";
 import { rateLimitRow, type RateLimitRuleRow, type WafForm } from "./model";
 import { GeoBlockCard } from "./GeoBlockCard";
+import { ChoiceCards } from "@/components/ui/ChoiceCards";
 
 const GLOBAL_MODE = { On: "blocking", DetectionOnly: "detection only", Off: "off" } as const;
 
@@ -38,35 +39,14 @@ function WafModePicker() {
         Mode
         <WasHint group="waf" />
       </span>
-      <div
+      <ChoiceCards
         id="f-waf-mode"
-        tabIndex={-1}
-        role="group"
-        aria-labelledby="f-waf-mode-label"
-        className="grid grid-cols-[repeat(auto-fit,minmax(min(180px,100%),1fr))] gap-1 rounded-xl border border-line bg-background p-1"
-      >
-        {modes.map((mode) => {
-          const pressed = form.waf.mode === mode.value;
-          return (
-            <button
-              key={mode.value}
-              type="button"
-              aria-pressed={pressed}
-              onClick={() => update((f) => ({ ...f, waf: { ...f.waf, mode: mode.value } }))}
-              className={cn(
-                "flex flex-col gap-1 rounded-[9px] border px-3 py-2.5 text-left transition-colors",
-                pressed ? "border-line2 bg-raise" : "border-transparent hover:bg-panel2"
-              )}
-            >
-              <span className={cn("flex items-center gap-2 font-semibold", pressed ? "text-foreground" : "text-muted-foreground")}>
-                <span aria-hidden="true" className={cn("h-2 w-2 rounded-full", mode.dot)} />
-                {mode.label}
-              </span>
-              {mode.description && <span className="text-xs leading-[17px] text-muted-foreground">{mode.description}</span>}
-            </button>
-          );
-        })}
-      </div>
+        labelledBy="f-waf-mode-label"
+        value={form.waf.mode}
+        minWidth={180}
+        onChange={(mode) => update((f) => ({ ...f, waf: { ...f.waf, mode } }))}
+        options={modes.map((mode) => ({ value: mode.value, label: mode.label, description: mode.description, dot: mode.dot }))}
+      />
       <FieldError id="f-waf-mode" />
     </div>
   );

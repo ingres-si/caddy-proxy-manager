@@ -257,7 +257,7 @@ export default function PullReplicasPanel({
               return (
                 <li key={replica.id} className="flex flex-col gap-3 px-[18px] py-3.5">
                   <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-                    <span className="num font-semibold [overflow-wrap:anywhere]">{replica.name}</span>
+                    <span className="font-semibold [overflow-wrap:anywhere]">{replica.name}</span>
                     <StatusDot tone={checkIn.tone} label={checkIn.label} />
                     {!replica.enabled && <Badge variant="muted">Disabled</Badge>}
                     {replica.caddy && !replica.caddy.ok && <Badge variant="destructive">Caddy apply failed</Badge>}

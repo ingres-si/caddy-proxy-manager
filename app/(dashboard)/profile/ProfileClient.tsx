@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/src/lib/auth-client";
 import { Camera, LogIn, LogOut, Trash2, Unlink } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { ApiToken } from "@/lib/models/api-tokens";
 import type { PasswordSignInBlocker } from "@/src/lib/models/user";
 import type { SessionView } from "@/src/lib/models/sessions";
@@ -276,22 +277,19 @@ export default function ProfileClient({
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <nav aria-label="Breadcrumb" className="flex gap-1.5 text-xs text-muted-foreground">
-            <span>Account</span>
-            <span aria-hidden="true">/</span>
-            <span>Profile</span>
-          </nav>
-          <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
-        </div>
-        <form action="/api/auth/logout" method="POST">
-          <Button type="submit" variant="outline">
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </Button>
-        </form>
-      </header>
+      <PageHeader
+        className="mb-0"
+        breadcrumb={["Account", "Profile"]}
+        title="Profile"
+        actions={
+          <form action="/api/auth/logout" method="POST">
+            <Button type="submit" variant="outline">
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </Button>
+          </form>
+        }
+      />
 
       {error && (
         <Alert variant="destructive">

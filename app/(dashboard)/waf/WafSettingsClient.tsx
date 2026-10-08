@@ -4,14 +4,17 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ShieldAlert, Info, TriangleAlert } from "lucide-react";
+import { ShieldAlert, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { formatDateTimeUtc } from "@/src/lib/date-format";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { ChoiceCards } from "@/components/ui/ChoiceCards";
+import { Banner } from "@/components/ui/Banner";
+import { useFormat } from "@/src/components/preferences/PreferencesProvider";
 import { bytesToMib, MAX_BODY_LIMIT_MIB, MIN_BODY_LIMIT_MIB, BYTES_PER_MIB } from "@/src/lib/caddy-waf";
 import type { WafSettings } from "@/src/lib/settings";
 import {
@@ -132,6 +135,7 @@ export default function WafSettingsClient({ data }: { data: WafSettingsPageData 
   const [saved, setSaved] = useState<FormState>(() => formFromSettings(data.settings));
   const [form, setForm] = useState<FormState>(saved);
   const [savedAt, setSavedAt] = useState(data.savedAt);
+  const format = useFormat();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const readOnly = !data.canWrite;
@@ -220,56 +224,48 @@ export default function WafSettingsClient({ data }: { data: WafSettingsPageData 
 
   return (
     <div className="flex w-full flex-col gap-5">
-      <header className="flex flex-wrap items-end gap-4">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <nav aria-label="Breadcrumb" className="flex gap-1.5 text-sm text-muted-foreground">
-            <span>Observe</span>
-            <span aria-hidden="true">/</span>
-            <Link href="/security" className="hover:text-foreground">Security events</Link>
-            <span aria-hidden="true">/</span>
-            <span aria-current="page">WAF settings</span>
-          </nav>
-          <h1 className="text-2xl font-semibold tracking-tight">WAF settings</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2.5">
-          {savedAt && <span className="text-sm text-muted-foreground">Saved {formatDateTimeUtc(new Date(savedAt).getTime())} UTC</span>}
-          <Button asChild variant="outline">
-            <Link href="/security?kind=waf">
-              <ShieldAlert aria-hidden="true" />
-              WAF events
-            </Link>
-          </Button>
-          {!readOnly && (
-            <Button onClick={save} disabled={pending || invalid || changed.length === 0}>
-              Save and apply
+      <PageHeader
+        className="mb-0"
+        breadcrumb={["Observe", { label: "Security events", href: "/security" }, "WAF settings"]}
+        title="WAF settings"
+        actions={
+          <>
+            {savedAt && <span className="text-[13px] text-muted-foreground">Saved {format.dateTime(savedAt)}</span>}
+            <Button asChild variant="outline">
+              <Link href="/security?kind=waf">
+                <ShieldAlert aria-hidden="true" />
+                WAF events
+              </Link>
             </Button>
-          )}
-        </div>
-      </header>
+            {!readOnly && (
+              <Button onClick={save} disabled={pending || invalid || changed.length === 0}>
+                Save and apply
+              </Button>
+            )}
+          </>
+        }
+      />
 
-      {readOnly && (
-        <p role="note" className="rounded-lg border bg-muted/30 px-4 py-2.5 text-sm text-muted-foreground">
-          Read-only: changing the WAF settings needs the waf:write permission.
-        </p>
-      )}
+      {readOnly && <Banner tone="neutral" title="Read-only: changing the WAF settings needs the waf:write permission." />}
 
       {changed.length > 0 && !readOnly && (
-        <div role="status" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border bg-primary/5 px-4 py-2.5">
-          <Info className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-          <span className="min-w-0 flex-1 text-sm">
-            <span className="font-semibold">Not applied yet: {changed.map((key) => FIELD_LABELS[key]).join(", ")}.</span>
-          </span>
-          <span className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={discard} disabled={pending}>Discard</Button>
-            <Button size="sm" onClick={save} disabled={pending || invalid}>Save and apply</Button>
-          </span>
-        </div>
+        <Banner
+          tone="info"
+          live
+          title={`Not applied yet: ${changed.map((key) => FIELD_LABELS[key]).join(", ")}.`}
+          actions={
+            <>
+              <Button size="sm" variant="outline" onClick={discard} disabled={pending}>Discard</Button>
+              <Button size="sm" onClick={save} disabled={pending || invalid}>Save and apply</Button>
+            </>
+          }
+        />
       )}
 
       {error && (
-        <p role="alert" className="rounded-lg border border-destructive/50 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
+        <Banner tone="bad" live>
           {error}
-        </p>
+        </Banner>
       )}
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border bg-card px-4 py-2.5 text-sm text-muted-foreground">
@@ -307,39 +303,18 @@ export default function WafSettingsClient({ data }: { data: WafSettingsPageData 
                 <span>Apply to all <span className="font-mono">{fmt(data.hosts.length)}</span> hosts</span>
               </label>
             </div>
-            <div role="radiogroup" aria-label="Global mode" className="grid grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))] gap-2.5">
-              {MODES.map((option) => {
-                const checked = form.mode === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={checked}
-                    disabled={readOnly}
-                    onClick={() => set("mode", option.value)}
-                    className={cn(
-                      "flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed",
-                      checked ? "border-primary bg-primary/5" : "hover:border-muted-foreground/40"
-                    )}
-                  >
-                    <span className="flex items-center gap-2 font-semibold">
-                      <span
-                        aria-hidden="true"
-                        className={cn("grid h-4 w-4 place-items-center rounded-full border-2", checked ? "border-primary" : "border-input")}
-                      >
-                        <span className={cn("h-1.5 w-1.5 rounded-full", checked && "bg-primary")} />
-                      </span>
-                      {option.label}
-                      {option.recommended && (
-                        <span className="rounded-full bg-primary/10 px-1.5 text-[11px] font-semibold leading-[18px] text-primary">Recommended</span>
-                      )}
-                    </span>
-                    <span className="text-sm text-muted-foreground">{option.description}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <ChoiceCards
+              label="Global mode"
+              value={form.mode}
+              disabled={readOnly}
+              onChange={(mode) => set("mode", mode)}
+              options={MODES.map((option) => ({
+                value: option.value,
+                label: option.label,
+                description: option.description,
+                badge: option.recommended ? "Recommended" : undefined,
+              }))}
+            />
             {modeNote && (
               <div
                 role="status"
