@@ -3,6 +3,8 @@ export type ActionState = {
   message?: string;
   /** Set when a change approval policy turned the change into a change request (ee/approvals). */
   changeRequest?: { id: number; status: string };
+  /** The row the action created, when it created one. */
+  id?: number;
 };
 
 export const INITIAL_ACTION_STATE: ActionState = { status: "idle" };

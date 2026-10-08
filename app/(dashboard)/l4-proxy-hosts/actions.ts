@@ -26,6 +26,12 @@ import {
 } from "@/src/lib/models/l4-proxy-hosts";
 import { parseCheckbox, parseCsv, parseUpstreams, parseOptionalText, parseOptionalNumber } from "@/src/lib/form-parse";
 import { gateHostChange, type GateOutcome } from "@/ee/approvals/requests";
+import { CaddyApplyError } from "@/src/lib/caddy-apply-error";
+
+/** Stored, but Caddy did not take it: the change is saved and applied once an apply succeeds. */
+function notLiveMessage(error: CaddyApplyError): string {
+  return `Saved, but not live yet: ${error.message}. Caddy keeps serving its previous configuration until an apply succeeds.`;
+}
 
 /** The dialog's answer when a change approval policy turned the change into a change request. */
 function changeRequestState(gate: GateOutcome): ActionState {
@@ -216,10 +222,14 @@ export async function createL4ProxyHostAction(
       emergencyReason: formData.get("emergencyReason"),
     });
     if (gate) return changeRequestState(gate);
-    await createL4ProxyHost(input, userId);
+    const host = await createL4ProxyHost(input, userId);
     revalidatePath("/l4-proxy-hosts");
-    return actionSuccess("L4 proxy host created and queued for Caddy reload.");
+    return { ...actionSuccess("L4 host created."), id: host.id };
   } catch (error) {
+    if (error instanceof CaddyApplyError && error.l4ProxyHostId !== undefined) {
+      revalidatePath("/l4-proxy-hosts");
+      return { ...actionSuccess(notLiveMessage(error)), id: error.l4ProxyHostId };
+    }
     console.error("Failed to create L4 proxy host:", error);
     return actionError(error, "Failed to create L4 proxy host.");
   }
@@ -275,9 +285,18 @@ export async function updateL4ProxyHostAction(
       emergencyReason: formData.get("emergencyReason"),
     });
     if (gate) return changeRequestState(gate);
-    await updateL4ProxyHost(existing.id, input, userId);
+    try {
+      await updateL4ProxyHost(existing.id, input, userId);
+    } catch (error) {
+      // The update is stored before Caddy is applied.
+      if (!(error instanceof CaddyApplyError)) throw error;
+      revalidatePath("/l4-proxy-hosts");
+      revalidatePath(`/l4-proxy-hosts/${existing.id}`);
+      return actionSuccess(notLiveMessage(error));
+    }
     revalidatePath("/l4-proxy-hosts");
-    return actionSuccess("L4 proxy host updated.");
+    revalidatePath(`/l4-proxy-hosts/${existing.id}`);
+    return actionSuccess("L4 host saved.");
   } catch (error) {
     console.error(`Failed to update L4 proxy host ${id}:`, error);
     return actionError(error, "Failed to update L4 proxy host.");

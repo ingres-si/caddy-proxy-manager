@@ -28,6 +28,7 @@ import { previewProxyHostEditorAction, saveProxyHostEditorAction } from "@/app/(
 import { changeGroups, formChanges, isSectionId, SECTION_LABELS, SECTIONS, type ChangeLookup, type FormChange, type SectionId } from "./changes";
 import { EditorProvider, type EditorContextValue } from "./fields";
 import { TabAnchor } from "./TabAnchor";
+import { useLeaveGuard } from "@/src/components/hosts/useLeaveGuard";
 import { HEALTH_CHECKS_TARGET } from "@/app/(dashboard)/proxy-hosts/links";
 import { buildPayload, copyHostForm, hostToForm, LB_POLICIES, newHostForm, payloadIsEmpty, serializeUpstreams, withHealthChecksOn, type HostForm } from "./model";
 import { fieldOfServerError, validateForm, type FieldErrors } from "./validate";
@@ -306,33 +307,7 @@ export function HostEditor({ data, workspace }: { data: HostEditorData; workspac
   }, []);
 
   // Leaving with unsaved changes asks first.
-  useEffect(() => {
-    if (!dirty || done || (creating && changes.length === 0)) return;
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-    };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [dirty, done, creating, changes.length]);
-
-  // Following a link to another page (the sidebar, a breadcrumb) with unsaved changes asks first:
-  // client-side navigation fires no beforeunload. Anchors within this page (#routing …) pass.
-  useEffect(() => {
-    if (!dirty || done || (creating && changes.length === 0)) return;
-    const onClick = (event: MouseEvent) => {
-      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      const link = (event.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
-      if (!link || link.target === "_blank" || link.hasAttribute("download")) return;
-      const url = new URL(link.href, window.location.href);
-      if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return;
-      if (!window.confirm("Leave this page? Your unsaved changes are lost.")) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    };
-    document.addEventListener("click", onClick, true);
-    return () => document.removeEventListener("click", onClick, true);
-  }, [dirty, done, creating, changes.length]);
+  useLeaveGuard(dirty && !done && !(creating && changes.length === 0));
 
   // The review's preview: re-run whenever what would be sent changes while it is open.
   const payloadKey = JSON.stringify(payload);

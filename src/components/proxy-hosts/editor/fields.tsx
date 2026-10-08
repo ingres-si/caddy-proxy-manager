@@ -32,8 +32,31 @@ export type EditorContextValue = {
 
 const EditorContext = createContext<EditorContextValue | null>(null);
 
+/**
+ * What the fields below need from the form they are in: its errors, a way to
+ * mark a field visited, and the "Was …" of a changed setting. The host editor
+ * provides it; another form (the L4 host editor) provides its own with
+ * FieldsProvider, and fields outside any show no errors.
+ */
+export type FieldsContextValue = {
+  errors: Readonly<Record<string, { message: string }>>;
+  touch: (id: string) => void;
+  wasOf: (groupId: string) => string | null;
+};
+
+const NO_FIELDS: FieldsContextValue = { errors: {}, touch: () => {}, wasOf: () => null };
+const FieldsContext = createContext<FieldsContextValue>(NO_FIELDS);
+
+export function FieldsProvider({ value, children }: { value: FieldsContextValue; children: ReactNode }) {
+  return <FieldsContext.Provider value={value}>{children}</FieldsContext.Provider>;
+}
+
 export function EditorProvider({ value, children }: { value: EditorContextValue; children: ReactNode }) {
-  return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
+  return (
+    <EditorContext.Provider value={value}>
+      <FieldsProvider value={value}>{children}</FieldsProvider>
+    </EditorContext.Provider>
+  );
 }
 
 export function useEditor(): EditorContextValue {
@@ -44,7 +67,7 @@ export function useEditor(): EditorContextValue {
 
 /** Props that tie an input to its hint and error. */
 export function useFieldProps(id: string, hint?: boolean) {
-  const { errors, touch } = useEditor();
+  const { errors, touch } = useContext(FieldsContext);
   const error = errors[id];
   const describedBy = [hint ? `${id}-hint` : null, error ? `${id}-error` : null].filter(Boolean).join(" ");
   return {
@@ -56,7 +79,7 @@ export function useFieldProps(id: string, hint?: boolean) {
 }
 
 export function FieldError({ id }: { id: string }) {
-  const { errors } = useEditor();
+  const { errors } = useContext(FieldsContext);
   const error = errors[id];
   if (!error) return null;
   return (
@@ -67,7 +90,7 @@ export function FieldError({ id }: { id: string }) {
 }
 
 export function WasHint({ group }: { group: string }) {
-  const { wasOf } = useEditor();
+  const { wasOf } = useContext(FieldsContext);
   const was = wasOf(group);
   if (!was) return null;
   return <span className="text-xs font-medium text-brand">Was {was}</span>;

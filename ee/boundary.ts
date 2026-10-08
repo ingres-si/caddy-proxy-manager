@@ -122,6 +122,7 @@ export const CORE_EE_HOOKS: Readonly<Record<string, string>> = {
   "proxy.ts": "High availability: a standby's 503, the request-path routes it still serves, and a refused replica's 503.",
   "src/components/auth/AuthBrand.tsx": "White-label: the product name and logo on the sign-in pages.",
   "src/components/l4-proxy-hosts/L4HostDialogs.tsx": "Change approvals: the notice that a protected host's change needs approval.",
+  "src/components/l4-proxy-hosts/editor/L4HostEditor.tsx": "Change approvals: whether a policy covers the L4 host being edited.",
   "src/components/mfa/BackupCodesPanel.tsx": "White-label: the product name in the backup codes file.",
   "src/components/proxy-hosts/editor/AccessSection.tsx": "White-label: the product name in help text.",
   "src/components/proxy-hosts/editor/HostEditor.tsx": "Change approvals: whether a policy covers the host being edited.",

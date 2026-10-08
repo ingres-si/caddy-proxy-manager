@@ -161,7 +161,7 @@ describe('navigation', () => {
 
   // Form pages opened from another page (like the [id] pages): not navigation
   // destinations of their own, so they are not listed, but guarded all the same.
-  const FORM_PAGES: Record<string, string> = { '/proxy-hosts/new': 'proxy_hosts:write' };
+  const FORM_PAGES: Record<string, string> = { '/proxy-hosts/new': 'proxy_hosts:write', '/l4-proxy-hosts/new': 'l4_proxy_hosts:write' };
 
   it('lists every dashboard page, each with the permission its page guard checks', () => {
     const pages = files(join(ROOT, 'app/(dashboard)'), /^page\.tsx$/)

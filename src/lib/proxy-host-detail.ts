@@ -116,9 +116,14 @@ function actorName(user: { name: string | null; email: string | null } | null, u
   return userId !== null ? `Deleted user #${userId}` : null;
 }
 
-async function loadChanges(access: Access, hostId: number): Promise<HostDetail["changes"]> {
+/** A host's recent changes from the audit log, the latest with their diffs; null without audit_log:read. */
+export async function loadHostChanges(
+  access: Access,
+  entityType: "proxy_host" | "l4_proxy_host",
+  hostId: number
+): Promise<HostDetail["changes"]> {
   if (!can(access, "audit_log:read")) return null;
-  const filter = { entityType: "proxy_host", entityId: hostId };
+  const filter = { entityType, entityId: hostId };
   const [events, total] = await Promise.all([queryAuditEvents(filter, { limit: CHANGES_SHOWN, offset: 0 }), countAuditEventsMatching(filter)]);
   const canRollBack = can(access, "config_history:restore");
   const entries = await Promise.all(
@@ -177,7 +182,7 @@ export async function loadHostDetail(
     loadTraffic(access, host, now).catch((): HostTrafficDetail | null => null),
     loadErrorRateAlert(access, host.id),
     getProxyHostHealth(host),
-    loadChanges(access, host.id).catch(() => ({ total: 0, entries: [] })),
+    loadHostChanges(access, "proxy_host", host.id).catch(() => ({ total: 0, entries: [] })),
   ]);
   const row = insights.rows[0];
   const input = insights.inputs.get(host.id)!;

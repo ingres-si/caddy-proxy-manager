@@ -53,14 +53,6 @@ describe('L4ProxyHostsClient banner integration', () => {
     expect(client).toMatch(/toggleL4ProxyHostAction[\s\S]{0,200}signalBannerRefresh/);
   });
 
-  it('increments bannerRefresh when create dialog closes', () => {
-    expect(client).toMatch(/CreateL4HostDialog[\s\S]{0,400}signalBannerRefresh/);
-  });
-
-  it('increments bannerRefresh when edit dialog closes', () => {
-    expect(client).toMatch(/EditL4HostDialog[\s\S]{0,400}signalBannerRefresh/);
-  });
-
   it('increments bannerRefresh when delete dialog closes', () => {
     expect(client).toMatch(/DeleteL4HostDialog[\s\S]{0,400}signalBannerRefresh/);
   });
@@ -69,5 +61,12 @@ describe('L4ProxyHostsClient banner integration', () => {
     // Must use functional update form to avoid stale closure
     expect(client).toMatch(/signalBannerRefresh\s*=\s*\(\s*\)\s*=>\s*setBannerRefresh\s*\(/);
     expect(client).toContain('n + 1');
+  });
+});
+
+describe('L4 host page banner', () => {
+  it('re-fetches when the host changes (a save or the on/off switch refreshes the page)', () => {
+    const page = readFileSync(resolve(__dirname, '../../app/(dashboard)/l4-proxy-hosts/[id]/L4HostPageClient.tsx'), 'utf-8');
+    expect(page).toContain('refreshSignal={Date.parse(host.updatedAt)}');
   });
 });

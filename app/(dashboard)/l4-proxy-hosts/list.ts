@@ -171,7 +171,9 @@ export function serverNameSummary(host: L4ProxyHost): { first: string; more: num
 }
 
 export type L4DetailItem = { label: string; value: string; mono?: boolean };
-export type L4DetailGroup = { title: string; items: L4DetailItem[] };
+/** A tab of the L4 host editor (src/components/l4-proxy-hosts/editor/model.ts). */
+export type L4DetailSection = "routing" | "load-balancing" | "security" | "advanced";
+export type L4DetailGroup = { section: L4DetailSection; title: string; items: L4DetailItem[] };
 
 const POLICY_LABELS: Record<string, string> = {
   random: "Random",
@@ -275,7 +277,7 @@ function resolverText(host: L4ProxyHost): string {
   return resolver.resolvers.join(", ");
 }
 
-/** The detail panel's groups, from the host's own settings. */
+/** The host page's configuration summary, one group per tab of its editor, from the host's own settings. */
 export function l4DetailGroups(host: L4ProxyHost): L4DetailGroup[] {
   const tls =
     host.protocol === "udp"
@@ -287,33 +289,35 @@ export function l4DetailGroups(host: L4ProxyHost): L4DetailGroup[] {
         : "Off";
   return [
     {
-      title: "Listening",
+      section: "routing",
+      title: "Routing",
       items: [
         { label: "Protocol", value: host.protocol.toUpperCase() },
         { label: "Listen address", value: host.listenAddress, mono: true },
-        { label: "Matcher", value: matcherText(host) },
-      ],
-    },
-    {
-      title: "Upstream",
-      items: [
         { label: host.upstreams.length === 1 ? "Upstream" : "Upstreams", value: host.upstreams.join(", "), mono: true },
-        { label: "Load balancing", value: loadBalancingText(host) },
-        { label: "Health check", value: healthText(host) },
-      ],
-    },
-    {
-      title: "TLS and PROXY protocol",
-      items: [
+        { label: "Matcher", value: matcherText(host) },
         { label: "TLS termination", value: tls },
         { label: "Accept inbound PROXY protocol", value: host.proxyProtocolReceive ? "On" : "Off" },
         { label: "Send PROXY protocol to upstream", value: host.proxyProtocolVersion ?? "None" },
       ],
     },
     {
-      title: "Access and DNS",
+      section: "load-balancing",
+      title: "Load balancing",
       items: [
-        { label: "Geo blocking", value: geoSummary(host) },
+        { label: "Load balancing", value: loadBalancingText(host) },
+        { label: "Health check", value: healthText(host) },
+      ],
+    },
+    {
+      section: "security",
+      title: "Security",
+      items: [{ label: "Geo blocking", value: geoSummary(host) }],
+    },
+    {
+      section: "advanced",
+      title: "Advanced",
+      items: [
         { label: "Upstream DNS pinning", value: dnsPinningText(host) },
         { label: "DNS resolver", value: resolverText(host) },
         { label: "Tags", value: host.tags.length ? host.tags.join(", ") : "None" },

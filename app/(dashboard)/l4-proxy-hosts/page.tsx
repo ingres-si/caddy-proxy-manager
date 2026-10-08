@@ -35,7 +35,6 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
       statusCounts={view.statusCounts}
       showTags={all.some((host) => host.tags.length > 0)}
       canWrite={can(access, "l4_proxy_hosts:write")}
-      scopeTags={scope ? [...scope] : []}
       approval={await getHostApprovalContext(access)}
     />
   );

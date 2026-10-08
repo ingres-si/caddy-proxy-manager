@@ -194,11 +194,13 @@ Every guard of a route, page or server action and the permission it checks. Rout
 | `app/(dashboard)/history/page.tsx` | `HistoryPage` | `config_history:read` |
 | `app/(dashboard)/high-availability/page.tsx` | `HighAvailabilityPage` | `settings:read` |
 | `app/(dashboard)/instances/page.tsx` | `InstancesPage` | `settings:read` |
+| `app/(dashboard)/l4-proxy-hosts/[id]/page.tsx` | `L4HostPage` | `l4_proxy_hosts:read` |
 | `app/(dashboard)/l4-proxy-hosts/actions.ts` | `createL4ProxyHostAction` | `l4_proxy_hosts:write` |
 | `app/(dashboard)/l4-proxy-hosts/actions.ts` | `updateL4ProxyHostAction` | `l4_proxy_hosts:write` |
 | `app/(dashboard)/l4-proxy-hosts/actions.ts` | `deleteL4ProxyHostAction` | `l4_proxy_hosts:write` |
 | `app/(dashboard)/l4-proxy-hosts/actions.ts` | `toggleL4ProxyHostAction` | `l4_proxy_hosts:write` |
 | `app/(dashboard)/l4-proxy-hosts/bulk-actions.ts` | `bulkL4ProxyHostsAction` | `l4_proxy_hosts:write` |
+| `app/(dashboard)/l4-proxy-hosts/new/page.tsx` | `NewL4HostPage` | `l4_proxy_hosts:write` |
 | `app/(dashboard)/l4-proxy-hosts/page.tsx` | `L4ProxyHostsPage` | `l4_proxy_hosts:read` |
 | `app/(dashboard)/ldap/page.tsx` | `LdapPage` | `ldap:read` |
 | `app/(dashboard)/oauth-providers/page.tsx` | `OAuthProvidersPage` | `settings:read` |

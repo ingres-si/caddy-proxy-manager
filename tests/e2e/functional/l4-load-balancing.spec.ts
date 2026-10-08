@@ -26,33 +26,32 @@ const SESSION_HEADERS = { Origin: BASE_URL };
 
 test.describe.serial('L4 TCP Load Balancing', () => {
   test('setup: create L4 host with load balancing and active health check', async ({ page }) => {
-    await page.goto('/l4-proxy-hosts');
-    await page.getByRole('button', { name: /new l4 host/i }).first().click();
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
+    await page.goto('/l4-proxy-hosts/new');
+    await expect(page.locator('nav[data-host-tabs][data-hydrated="true"]')).toBeVisible();
 
-    await dialog.getByLabel('Name').fill(HOST_NAME);
-    await dialog.getByLabel('Listen Address').fill(`:${TCP_PORT}`);
-    await dialog.getByLabel('Upstreams').fill('tcp-echo:9999\ntcp-echo:9000');
+    await page.getByLabel('Name', { exact: true }).fill(HOST_NAME);
+    await page.getByLabel('Listen address').fill(`:${TCP_PORT}`);
+    await page.getByLabel('Upstream 1', { exact: true }).fill('tcp-echo:9999');
+    await page.getByRole('button', { name: 'Add upstream' }).click();
+    await page.getByLabel('Upstream 2', { exact: true }).fill('tcp-echo:9000');
 
-    await dialog.getByRole('button', { name: 'Load Balancer' }).click();
-    await dialog.getByRole('switch', { name: 'Enable Load Balancing' }).click();
-    await dialog.locator('#lbPolicy').click();
-    await page.getByRole('option', { name: 'First Available' }).click();
-    await dialog.getByLabel('Try Duration').fill('5s');
-    await dialog.getByLabel('Try Interval').fill('250ms');
-    await dialog.getByLabel('Enable Active Health Check').click();
+    await page.getByRole('tab', { name: 'Load balancing' }).click();
+    await page.getByRole('switch', { name: 'Load balancing and health checks' }).click();
+    await page.getByLabel('Policy').selectOption('first');
+    await page.getByLabel('Keep trying for').fill('5s');
+    await page.getByLabel('Wait between tries').fill('250ms');
+    await page.getByRole('switch', { name: 'Active health checks' }).click();
 
     // Fields caddy-l4 does not support must not be offered.
-    await expect(dialog.getByLabel('Retries')).toHaveCount(0);
-    await expect(dialog.getByLabel('Unhealthy Latency')).toHaveCount(0);
+    await expect(page.getByLabel('Max retries')).toHaveCount(0);
+    await expect(page.getByLabel('Unhealthy latency')).toHaveCount(0);
 
-    await dialog.getByRole('button', { name: /create/i }).click();
+    await page.getByTestId('host-editor-bar').getByRole('button', { name: 'Create host' }).click();
 
-    // Before the fix Caddy rejected the config and the dialog stayed open
-    // with "Caddy rejected configuration".
-    await expect(dialog).not.toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('table').getByText(HOST_NAME)).toBeVisible({ timeout: 10_000 });
+    // Before the fix Caddy rejected the config and the host was not created
+    // ("Caddy rejected configuration").
+    await expect(page).toHaveURL(/\/l4-proxy-hosts\/\d+$/, { timeout: 15_000 });
+    await expect(page.getByRole('heading', { level: 1, name: HOST_NAME })).toBeVisible({ timeout: 10_000 });
 
     await waitForTcpRoute('127.0.0.1', TCP_PORT);
   });

@@ -144,7 +144,7 @@ describe('L4 hosts list', () => {
     expect(matcherText(host({ protocol: 'udp' }))).toBe('None, every datagram');
   });
 
-  it('builds the detail panel from the host settings only', () => {
+  it('summarises the host settings per editor tab, from the host settings only', () => {
     const groups = l4DetailGroups(
       host({
         upstreams: ['a:22', 'b:22'],

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AlignLeft, BadgeCheck, ExternalLink, Lock, Route, Settings2, Shield, type LucideIcon } from "lucide-react";
 import { useFormat } from "@/src/components/preferences/PreferencesProvider";
-import type { HostDetail, HostChangeEntry } from "@/src/lib/proxy-host-detail";
+import type { HostDetail } from "@/src/lib/proxy-host-detail";
 import type { HostAttention } from "@/src/lib/proxy-host-view";
 import { primaryDomain, statusText } from "@/src/lib/proxy-host-view";
 import type { HostEditorSection } from "@/src/lib/proxy-host-config-summary";
@@ -17,19 +17,19 @@ import { Banner, type BannerTone } from "@/components/ui/Banner";
 import { KpiTile } from "@/components/ui/KpiTile";
 import { StackedBarChart } from "@/components/ui/StackedBarChart";
 import { TopList, type TopListSegment } from "@/components/ui/TopList";
-import { DiffView } from "@/components/ui/DiffView";
 import { StatusDot, type StatusTone } from "@/components/ui/StatusDot";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/button";
 import { formatBytes, formatCount, formatPercent } from "@/components/ui/chart-format";
 import { cn } from "@/lib/utils";
 import { toggleProxyHostAction } from "../actions";
-import { hostAnalyticsHref, hostAuditHref, HEALTH_CHECKS_TARGET, historyVersionHref, siteUrl } from "../links";
+import { hostAnalyticsHref, hostAuditHref, HEALTH_CHECKS_TARGET, siteUrl } from "../links";
 import { HostEditor } from "@/src/components/proxy-hosts/editor/HostEditor";
 import { TabAnchor } from "@/src/components/proxy-hosts/editor/TabAnchor";
 import type { HostEditorData } from "@/src/components/proxy-hosts/editor/types";
 import { CertificateSummary, ProtectionPills, TagChips, useHostStatus } from "../host-parts";
 import { ErrorShareLine } from "./ErrorShareLine";
+import { HostChanges } from "@/src/components/hosts/HostChanges";
 
 type HostInfo = { id: number; name: string; domains: string[]; enabled: boolean; tags: string[] };
 
@@ -240,28 +240,6 @@ function IncidentBanner({
     <Banner tone={tone} title={title} actions={actions.length > 0 ? actions : undefined}>
       {body}
     </Banner>
-  );
-}
-
-function ChangeEntry({ entry, time }: { entry: HostChangeEntry; time: { relative: (v: string) => string; dateTime: (v: string) => string } }) {
-  return (
-    <li className="flex flex-col gap-2 border-b border-line px-[18px] py-3 last:border-b-0">
-      <span className="text-[13px]">
-        <span className="font-semibold">{entry.actor ?? "System"}</span> <span className="text-muted-foreground">{entry.summary}</span>
-      </span>
-      {entry.fields && entry.fields.length > 0 && <DiffView fields={entry.fields} label={`What "${entry.summary}" changed`} />}
-      {entry.moreFields > 0 && <span className="text-xs text-soft">and {plural(entry.moreFields, "more field")}</span>}
-      <span className="flex flex-wrap gap-3 text-xs text-soft">
-        <time dateTime={entry.createdAt} title={time.dateTime(entry.createdAt)} suppressHydrationWarning>
-          {time.relative(entry.createdAt)}
-        </time>
-        {entry.rollbackVersionId !== null && (
-          <Link href={historyVersionHref(entry.rollbackVersionId)} className="text-brand underline-offset-4 hover:underline">
-            Roll back
-          </Link>
-        )}
-      </span>
-    </li>
   );
 }
 
@@ -535,20 +513,7 @@ export default function HostDetailClient({ host, detail, can: allowed, editor = 
     </div>
   );
 
-  const history =
-    allowed.auditLog && changes ? (
-      <SectionCard title="Changes to this host" count={changes.total > 0 ? changes.total : null} link={{ label: "Open in the audit log", href: hostAuditHref(host.id) }}>
-        {changes.entries.length === 0 ? (
-          <p className="m-0 px-[18px] py-3.5 text-[13px] text-soft">No changes recorded yet.</p>
-        ) : (
-          <ol className="m-0 list-none p-0">
-            {changes.entries.map((entry) => (
-              <ChangeEntry key={entry.id} entry={entry} time={{ relative: (v) => format.relative(v), dateTime: (v) => format.dateTime(v) }} />
-            ))}
-          </ol>
-        )}
-      </SectionCard>
-    ) : null;
+  const history = allowed.auditLog && changes ? <HostChanges changes={changes} auditHref={hostAuditHref(host.id)} /> : null;
   const historyCount = changes ? changes.total : null;
 
   if (editor) {

@@ -36,11 +36,18 @@ vi.mock('next/navigation', () => ({
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
 import L4ProxyHostsPage from '@/app/(dashboard)/l4-proxy-hosts/page';
+import L4HostPage from '@/app/(dashboard)/l4-proxy-hosts/[id]/page';
+import NewL4HostPage from '@/app/(dashboard)/l4-proxy-hosts/new/page';
+import { createL4ProxyHostAction, updateL4ProxyHostAction } from '@/app/(dashboard)/l4-proxy-hosts/actions';
+import { getL4ProxyHost } from '@/src/lib/models/l4-proxy-hosts';
+import { l4FormData, l4HostToForm, newL4Form } from '@/src/components/l4-proxy-hosts/editor/model';
+import { INITIAL_ACTION_STATE } from '@/src/lib/actions';
 import { bulkL4ProxyHostsAction } from '@/app/(dashboard)/l4-proxy-hosts/bulk-actions';
 import { applyCaddyConfig } from '@/src/lib/caddy';
 import { logAuditEvent } from '@/src/lib/audit';
 import { deferCaddyApplyToBatch, inChangeBatch } from '@/src/lib/change-batch';
 import { first } from '@/src/lib/db/ops';
+import { CaddyApplyError } from '@/src/lib/caddy-apply-error';
 
 const ADMIN = 1;
 const TEAM_A = 2; // read and write, scoped to team-a
@@ -223,5 +230,120 @@ describe('L4 bulk actions', () => {
     expect(await l4Row(hosts.a)).toBeDefined();
     expect(await l4Row(hosts.b)).toBeUndefined();
     expect(await ctx.db.select().from(schema.changeRequests)).toMatchObject([{ targetType: 'l4_proxy_host', targetId: hosts.a, status: 'pending' }]);
+  });
+});
+
+type HostPageProps = {
+  host: { id: number; name: string };
+  canWrite: boolean;
+  changes: { total: number } | null;
+  editor: { host: { id: number } | null; template: unknown; scopeTags: string[] } | null;
+};
+
+async function hostPage(id: string): Promise<HostPageProps> {
+  const page = (await L4HostPage({ params: Promise.resolve({ id }) })) as { props: HostPageProps };
+  return page.props;
+}
+
+describe('L4 host page', () => {
+  it('opens a host with the editor for a role that may change it', async () => {
+    const props = await hostPage(String(hosts.a));
+    expect(props.host.name).toBe('Alpha SSH');
+    expect(props.canWrite).toBe(true);
+    expect(props.editor).toMatchObject({ host: { id: hosts.a }, template: null, scopeTags: [] });
+  });
+
+  it('shows a reader the host without the editor', async () => {
+    ctx.sessionUserId = READER;
+    const props = await hostPage(String(hosts.a));
+    expect(props.canWrite).toBe(false);
+    expect(props.editor).toBeNull();
+    // Readers without audit_log:read get no history.
+    expect(props.changes).toBeNull();
+  });
+
+  it('answers 404 for a missing host, a malformed id and a host outside the role\'s scope', async () => {
+    await expect(hostPage('999')).rejects.toThrow('NOT_FOUND');
+    await expect(hostPage('abc')).rejects.toThrow('NOT_FOUND');
+    ctx.sessionUserId = TEAM_A;
+    await expect(hostPage(String(hosts.b))).rejects.toThrow('NOT_FOUND');
+    expect((await hostPage(String(hosts.a))).editor?.scopeTags).toEqual(['team-a']);
+  });
+
+  it('starts a new host from a copy only of a host the role may see', async () => {
+    const copy = (await NewL4HostPage({ searchParams: Promise.resolve({ from: String(hosts.b) }) })) as { props: { data: { template: { id: number } | null } } };
+    expect(copy.props.data.template?.id).toBe(hosts.b);
+    ctx.sessionUserId = TEAM_A;
+    const scoped = (await NewL4HostPage({ searchParams: Promise.resolve({ from: String(hosts.b) }) })) as { props: { data: { template: unknown; scopeTags: string[] } } };
+    expect(scoped.props.data).toMatchObject({ template: null, scopeTags: ['team-a'] });
+    ctx.sessionUserId = READER;
+    await expect(NewL4HostPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(/permission|REDIRECT/i);
+  });
+});
+
+describe('L4 host editor saves', () => {
+  it('creates a host from the editor form and reports its id', async () => {
+    const form = newL4Form();
+    form.name = 'Postgres';
+    form.listenAddress = ':5432';
+    form.upstreams = ['192.0.2.20:5432', '192.0.2.21:5432'];
+    form.tags = ['db'];
+    form.lb = { ...form.lb, enabled: true, policy: 'least_conn', tryDuration: '5s', passive: { enabled: true, failDuration: '30s', maxFails: '2' } };
+    const result = await createL4ProxyHostAction(INITIAL_ACTION_STATE, l4FormData(form));
+    expect(result).toMatchObject({ status: 'success' });
+    const created = (await getL4ProxyHost(result.id!))!;
+    expect(l4HostToForm(created)).toEqual(form);
+  });
+
+  it('saves every setting of the form and clears the ones emptied, keeping the on/off state', async () => {
+    const before = (await getL4ProxyHost(hosts.a))!;
+    const form = l4HostToForm(before);
+    form.name = 'Alpha SSH 2';
+    form.matcherType = 'tls_sni';
+    form.matcherValue = ['ssh.example.com'];
+    form.tlsTermination = true;
+    form.proxyProtocolVersion = 'v2';
+    form.lb = { ...form.lb, enabled: true, policy: 'round_robin', tryDuration: '5s', active: { enabled: true, port: '22', interval: '10s', timeout: '2s' } };
+    form.geo = { ...form.geo, enabled: true, mode: 'override', blockCountries: ['CN'], allowAsns: ['AS3320'], allowCidrs: ['203.0.113.0/26'] };
+    form.dns = { enabled: true, resolvers: ['1.1.1.1'], fallbacks: [], timeout: '3s' };
+    form.pinning = { mode: 'enabled', family: 'ipv4' };
+    // The header disabled the host meanwhile: a save from the editor must not turn it back on.
+    await ctx.db.update(schema.l4ProxyHosts).set({ enabled: false }).where(eq(schema.l4ProxyHosts.id, hosts.a));
+    expect(await updateL4ProxyHostAction(hosts.a, INITIAL_ACTION_STATE, l4FormData(form, { enabled: false }))).toMatchObject({ status: 'success' });
+    const saved = (await getL4ProxyHost(hosts.a))!;
+    expect(saved.enabled).toBe(false);
+    // Tags come back sorted; ASNs without the AS prefix.
+    expect(l4HostToForm(saved)).toEqual({ ...form, enabled: false, tags: ['prod', 'team-a'], geo: { ...form.geo, allowAsns: ['3320'] } });
+
+    const cleared = l4HostToForm(saved);
+    cleared.lb = { ...cleared.lb, tryDuration: '', active: { ...cleared.lb.active, timeout: '' } };
+    cleared.dns = { ...cleared.dns, enabled: false, resolvers: [], timeout: '' };
+    await updateL4ProxyHostAction(hosts.a, INITIAL_ACTION_STATE, l4FormData(cleared, { enabled: false }));
+    expect(l4HostToForm((await getL4ProxyHost(hosts.a))!)).toEqual(cleared);
+  });
+
+  it('reports a server-side problem as an error without saving', async () => {
+    const form = l4HostToForm((await getL4ProxyHost(hosts.a))!);
+    form.listenAddress = ':443';
+    expect(await updateL4ProxyHostAction(hosts.a, INITIAL_ACTION_STATE, l4FormData(form, { enabled: false }))).toMatchObject({ status: 'error', message: expect.stringMatching(/443 is reserved/) });
+    expect((await l4Row(hosts.a))!.listenAddress).toBe(':2222');
+  });
+
+  it('reports a host stored while Caddy is unreachable as saved but not live, with its id', async () => {
+    vi.mocked(applyCaddyConfig).mockRejectedValue(new CaddyApplyError('Unable to reach Caddy API', 'CADDY_UNREACHABLE'));
+    const form = newL4Form();
+    form.name = 'Offline';
+    form.listenAddress = ':6000';
+    form.upstreams = ['192.0.2.30:6000'];
+    const created = await createL4ProxyHostAction(INITIAL_ACTION_STATE, l4FormData(form));
+    expect(created).toMatchObject({ status: 'success', message: expect.stringMatching(/^Saved, but not live yet: Unable to reach Caddy API/) });
+    expect((await getL4ProxyHost(created.id!))!.name).toBe('Offline');
+
+    const changed = { ...l4HostToForm((await getL4ProxyHost(created.id!))!), name: 'Offline 2' };
+    expect(await updateL4ProxyHostAction(created.id!, INITIAL_ACTION_STATE, l4FormData(changed, { enabled: false }))).toMatchObject({
+      status: 'success',
+      message: expect.stringMatching(/^Saved, but not live yet/),
+    });
+    expect((await getL4ProxyHost(created.id!))!.name).toBe('Offline 2');
   });
 });

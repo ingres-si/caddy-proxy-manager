@@ -9,6 +9,7 @@ Pull the new images and recreate the containers with `docker compose pull && doc
 - **Dismissing from Needs attention dismisses the alert for everyone** until it resolves (`POST /api/v1/alert-silences`). The per-account dismissals of v2.2.0 and `/api/v1/overview/attention/dismissals` are removed; the migration drops the `attention_dismissals` table.
 - **The Alerts page** has the tabs Open, History, Rules and Channels. The AI provider and analytics questions moved to **AI settings** (`/settings/ai`), the daily digest to the Channels tab; `/alerts?tab=ai` redirects.
 - **A proxy host's page holds its editor.** Overview, Routing, Security, Access, Certificate, Headers, Advanced and History are tabs of `/proxy-hosts/<id>` that switch in place; `/proxy-hosts/<id>/edit` leads there. Geo blocking moved from Access to Security.
+- **An L4 host has a page too.** `/l4-proxy-hosts/<id>` has the tabs Overview, Routing, Load balancing, Security, Advanced and History, and a new L4 host is created at `/l4-proxy-hosts/new`; the details panel and the create and edit dialogs of the L4 hosts list are gone.
 - One database migration runs on start.
 
 ## Upgrading to v2.2.0

@@ -8,7 +8,7 @@ Tags alone change nothing: Caddy's configuration does not use them. They label h
 
 - A tag starts with a letter or a digit and contains only letters, digits and `.` `_` `:` `/` `-` (no spaces), at most 40 characters.
 - Tags are stored lowercased, without duplicates, sorted. A host has at most 16 tags.
-- In the proxy host editor, add them one by one under **Tags** (Enter or comma after each); in the L4 host form, enter them comma-separated.
+- In the proxy host and L4 host editors, add them one by one under **Tags** (Enter or comma after each).
 
 ## REST API
 

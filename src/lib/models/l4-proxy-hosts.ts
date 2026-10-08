@@ -1,5 +1,6 @@
 import { appDb, nowIso, toIso } from "../db";
 import { applyCaddyConfig } from "../caddy";
+import { CaddyApplyError } from "../caddy-apply-error";
 import { RESERVED_L4_PORTS } from "../l4-reserved-ports";
 import { logAuditEvent } from "../audit";
 import { l4ProxyHosts } from "../db/schema";
@@ -564,7 +565,13 @@ export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: nu
     data: input,
   });
 
-  await applyCaddyConfig();
+  try {
+    await applyCaddyConfig();
+  } catch (error) {
+    // The host is stored: say which one, so the caller can tell it was saved but is not live yet.
+    if (error instanceof CaddyApplyError) error.l4ProxyHostId = record.id;
+    throw error;
+  }
   return (await getL4ProxyHost(record.id))!;
 }
 

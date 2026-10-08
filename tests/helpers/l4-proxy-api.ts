@@ -20,62 +20,37 @@ export interface L4ProxyHostConfig {
 }
 
 /**
- * Create an L4 proxy host via the browser UI.
+ * Create an L4 proxy host via the browser UI: the L4 host editor at
+ * /l4-proxy-hosts/new, which opens the host's page once it is created.
  */
 export async function createL4ProxyHost(page: Page, config: L4ProxyHostConfig): Promise<void> {
-  await page.goto('/l4-proxy-hosts');
-  // An empty list offers it in its empty state too.
-  await page.getByRole('button', { name: /new l4 host/i }).first().click();
-  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.goto('/l4-proxy-hosts/new');
+  // The fields are reset by hydration: wait until React owns them.
+  await expect(page.locator('nav[data-host-tabs][data-hydrated="true"]')).toBeVisible();
 
-  await page.getByLabel('Name').fill(config.name);
-
-  // Protocol select (shadcn Select renders a button with role="combobox")
+  await page.getByLabel('Name', { exact: true }).fill(config.name);
   if (config.protocol && config.protocol !== 'tcp') {
-    await page.getByRole('combobox', { name: 'Protocol' }).first().click();
-    await page.getByRole('option', { name: new RegExp(config.protocol, 'i') }).click();
+    await page.getByRole('group', { name: 'Protocol' }).getByRole('button', { name: config.protocol.toUpperCase() }).click();
   }
+  await page.getByLabel('Listen address').fill(config.listenAddress);
+  await page.getByLabel('Upstream 1', { exact: true }).fill(config.upstream);
 
-  await page.getByLabel('Listen Address').fill(config.listenAddress);
-  await page.getByLabel('Upstreams').fill(config.upstream);
-
-  // Matcher type
   if (config.matcherType && config.matcherType !== 'none') {
-    await page.getByLabel('Matcher').click();
-    const matcherLabels: Record<string, RegExp> = {
-      tls_sni: /tls sni/i,
-      http_host: /http host/i,
-      proxy_protocol: /proxy protocol/i,
-    };
-    await page.getByRole('option', { name: matcherLabels[config.matcherType] }).click();
-
+    await page.getByLabel('Matcher').selectOption(config.matcherType);
     if (config.matcherValue && (config.matcherType === 'tls_sni' || config.matcherType === 'http_host')) {
-      await page.getByLabel(/hostnames/i).fill(config.matcherValue);
+      const input = page.getByLabel(/^Add an? (SNI|HTTP) hostname$/);
+      for (const name of config.matcherValue.split(',').map((value) => value.trim()).filter(Boolean)) {
+        await input.fill(name);
+        await input.press('Enter');
+      }
     }
   }
+  if (config.tlsTermination) await page.getByRole('switch', { name: 'TLS termination' }).click();
+  if (config.proxyProtocolReceive) await page.getByRole('switch', { name: 'Accept inbound PROXY protocol' }).click();
+  if (config.proxyProtocolVersion) await page.getByLabel('Send PROXY protocol to the upstream').selectOption(config.proxyProtocolVersion);
 
-  // TLS termination
-  if (config.tlsTermination) {
-    await page.getByLabel(/tls termination/i).check();
-  }
-
-  // Proxy protocol receive
-  if (config.proxyProtocolReceive) {
-    await page.getByLabel(/accept inbound proxy/i).check();
-  }
-
-  // Proxy protocol version
-  if (config.proxyProtocolVersion) {
-    await page.getByLabel(/send proxy protocol/i).click();
-    await page.getByRole('option', { name: config.proxyProtocolVersion }).click();
-  }
-
-  // Submit
-  await page.getByRole('button', { name: /create/i }).click();
-
-  // Wait for success state (dialog closes or success alert)
-  await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
-
-  // Verify host appears in the table
-  await expect(page.getByRole('table').getByText(config.name)).toBeVisible({ timeout: 10_000 });
+  await page.getByTestId('host-editor-bar').getByRole('button', { name: 'Create host' }).click();
+  // The new host's page opens.
+  await expect(page).toHaveURL(/\/l4-proxy-hosts\/\d+$/, { timeout: 15_000 });
+  await expect(page.getByRole('heading', { level: 1, name: config.name })).toBeVisible({ timeout: 10_000 });
 }

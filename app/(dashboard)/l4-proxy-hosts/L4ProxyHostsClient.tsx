@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal, Network, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -26,7 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { CreateL4HostDialog, EditL4HostDialog, DeleteL4HostDialog } from "@/components/l4-proxy-hosts/L4HostDialogs";
+import { DeleteL4HostDialog } from "@/components/l4-proxy-hosts/L4HostDialogs";
 import { L4PortsApplyBanner, portMappingFor, type PortsDiff } from "@/components/l4-proxy-hosts/L4PortsApplyBanner";
 import {
   L4_DEFAULT_SORT_DIR,
@@ -37,7 +38,6 @@ import {
   type L4SortKey,
   type L4StatusFilter,
 } from "./list";
-import { L4HostDetailSheet } from "./L4HostDetail";
 
 type Props = {
   /** The hosts on this page of the list. */
@@ -54,9 +54,7 @@ type Props = {
   showTags?: boolean;
   /** The user may create, change and delete hosts (l4_proxy_hosts:write); true when omitted. */
   canWrite?: boolean;
-  /** The tags the user's role is limited to, if any. */
-  scopeTags?: string[];
-  /** Change approval policies (ee/approvals), so the dialogs can say a host is protected. */
+  /** Change approval policies (ee/approvals), so the delete dialogs can say a host is protected. */
   approval?: HostApprovalContext | null;
 };
 
@@ -169,19 +167,12 @@ export default function L4ProxyHostsClient({
   statusCounts,
   showTags = false,
   canWrite = true,
-  scopeTags = [],
   approval = null,
 }: Props) {
-  const [createOpen, setCreateOpen] = useState(false);
-  const [duplicateHost, setDuplicateHost] = useState<L4ProxyHost | null>(null);
-  const [editHost, setEditHost] = useState<L4ProxyHost | null>(null);
   const [deleteHost, setDeleteHost] = useState<L4ProxyHost | null>(null);
-  // Counter forces CreateL4HostDialog to remount on each open, resetting useFormState
-  const [dialogKey, setDialogKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState(query.search);
   const [bannerRefresh, setBannerRefresh] = useState(0);
   const [portsDiff, setPortsDiff] = useState<PortsDiff | null>(null);
-  const [detailId, setDetailId] = useState<number | null>(null);
   const [selected, setSelected] = useState<ReadonlySet<number>>(() => new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkPending, startBulk] = useTransition();
@@ -205,11 +196,9 @@ export default function L4ProxyHostsClient({
       const kept = [...current].filter((id) => onPage.has(id));
       return kept.length === current.size ? current : new Set(kept);
     });
-    setDetailId((id) => (id !== null && !onPage.has(id) ? null : id));
   }, [hosts]);
 
   const statusById = useMemo(() => new Map(hosts.map((host) => [host.id, l4HostStatus(host, portsDiff)])), [hosts, portsDiff]);
-  const detailHost = detailId === null ? null : hosts.find((host) => host.id === detailId) ?? null;
 
   function pushParams(update: (params: URLSearchParams) => void) {
     const params = new URLSearchParams(searchParams.toString());
@@ -269,10 +258,6 @@ export default function L4ProxyHostsClient({
     router.refresh();
   };
 
-  const openCreate = () => { setDuplicateHost(null); setDialogKey(k => k + 1); setCreateOpen(true); };
-  const openDuplicate = (host: L4ProxyHost) => { setDetailId(null); setDuplicateHost(host); setDialogKey(k => k + 1); setCreateOpen(true); };
-  const openEdit = (host: L4ProxyHost) => { setDetailId(null); setEditHost(host); };
-
   // ── Selection and bulk actions ──
   const selectedHosts = hosts.filter((host) => selected.has(host.id));
   const allSelected = hosts.length > 0 && selectedHosts.length === hosts.length;
@@ -318,11 +303,17 @@ export default function L4ProxyHostsClient({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => setDetailId(host.id)}>Details</DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/l4-proxy-hosts/${host.id}`}>Open</Link>
+        </DropdownMenuItem>
         {canWrite && (
           <>
-            <DropdownMenuItem onSelect={() => openEdit(host)}>Edit</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => openDuplicate(host)}>Duplicate</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/l4-proxy-hosts/${host.id}#routing`}>Edit</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/l4-proxy-hosts/new?from=${host.id}`}>Duplicate</Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-bad focus:text-bad" onSelect={() => setDeleteHost(host)}>
               Delete
@@ -342,14 +333,10 @@ export default function L4ProxyHostsClient({
       />
     );
 
-  const nameButton = (host: L4ProxyHost, className?: string) => (
-    <button
-      type="button"
-      onClick={() => setDetailId(host.id)}
-      className={cn("min-w-0 truncate text-left font-semibold text-foreground underline-offset-4 hover:underline", className)}
-    >
+  const nameLink = (host: L4ProxyHost, className?: string) => (
+    <Link href={`/l4-proxy-hosts/${host.id}`} className={cn("min-w-0 truncate font-semibold text-foreground underline-offset-4 hover:underline", className)}>
       {host.name}
-    </button>
+    </Link>
   );
 
   const filtering = Boolean(query.search) || query.protocol !== "all" || query.status !== "all";
@@ -363,9 +350,11 @@ export default function L4ProxyHostsClient({
         count={totalHosts}
         actions={
           canWrite ? (
-            <Button onClick={openCreate}>
-              <Plus />
-              New L4 host
+            <Button asChild>
+              <Link href="/l4-proxy-hosts/new">
+                <Plus />
+                New L4 host
+              </Link>
             </Button>
           ) : undefined
         }
@@ -381,9 +370,11 @@ export default function L4ProxyHostsClient({
             description="Forward TCP or UDP traffic, such as SSH, mail or WireGuard, to a service on your network."
             action={
               canWrite ? (
-                <Button onClick={openCreate}>
-                  <Plus />
-                  New L4 host
+                <Button asChild>
+                  <Link href="/l4-proxy-hosts/new">
+                    <Plus />
+                    New L4 host
+                  </Link>
                 </Button>
               ) : undefined
             }
@@ -554,7 +545,7 @@ export default function L4ProxyHostsClient({
                             )}
                             <td className={cn("px-2.5 py-2.5", !canWrite && "pl-[18px]")}>
                               <span className="flex min-w-0 items-baseline gap-2">
-                                {nameButton(host, "max-w-full shrink-0")}
+                                {nameLink(host, "max-w-full shrink-0")}
                                 <ServerNames host={host} />
                               </span>
                             </td>
@@ -602,7 +593,7 @@ export default function L4ProxyHostsClient({
                           />
                         )}
                         <div className="flex min-w-0 flex-1 flex-col gap-1">
-                          {nameButton(host)}
+                          {nameLink(host)}
                           <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                             <Listen host={host} className="shrink-0" />
                             <span aria-hidden="true" className="text-soft">→</span>
@@ -633,35 +624,6 @@ export default function L4ProxyHostsClient({
             />
           </section>
         </>
-      )}
-
-      <L4HostDetailSheet
-        host={detailHost}
-        status={detailHost ? statusById.get(detailHost.id) ?? null : null}
-        canWrite={canWrite}
-        onClose={() => setDetailId(null)}
-        onToggle={(host) => handleToggleEnabled(host.id, !host.enabled)}
-        onDuplicate={openDuplicate}
-        onEdit={openEdit}
-      />
-
-      <CreateL4HostDialog
-        key={dialogKey}
-        open={createOpen}
-        onClose={() => { setCreateOpen(false); setTimeout(() => setDuplicateHost(null), 200); signalBannerRefresh(); router.refresh(); }}
-        initialData={duplicateHost}
-        scopeTags={scopeTags}
-        approval={approval}
-      />
-
-      {editHost && (
-        <EditL4HostDialog
-          open={!!editHost}
-          host={editHost}
-          onClose={() => { setEditHost(null); signalBannerRefresh(); router.refresh(); }}
-          scopeTags={scopeTags}
-          approval={approval}
-        />
       )}
 
       {deleteHost && (

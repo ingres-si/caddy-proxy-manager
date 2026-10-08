@@ -10,6 +10,8 @@ export class CaddyApplyError extends Error {
   readonly code: CaddyApplyErrorCode;
   /** The proxy host a create stored before the apply failed (createProxyHost), so callers can say it was saved. */
   proxyHostId?: number;
+  /** The L4 host a create stored before the apply failed (createL4ProxyHost). */
+  l4ProxyHostId?: number;
 
   constructor(message: string, code: CaddyApplyErrorCode) {
     super(message);
