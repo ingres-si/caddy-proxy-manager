@@ -36,6 +36,8 @@ type Props = {
   canWrite?: boolean;
   /** Opens the dismiss dialog (offered with canWrite). */
   onDismiss?: (alert: FiringAlertView) => void;
+  /** Opens the editor for a new rule (offered with canWrite when there are no rules). */
+  onCreateRule?: () => void;
 };
 
 function Deliveries({ deliveries, notified, silenced = null }: { deliveries: AlertEventView["deliveries"]; notified: boolean; silenced?: AlertEventView["silenced"] }) {
@@ -234,7 +236,7 @@ function EpisodeDetail({ episode, hostNames }: { episode: AlertEpisode; hostName
   );
 }
 
-export default function FiringTab({ firing, episodes, rules, hostNames, now, onEditRule, canWrite = false, onDismiss }: Props) {
+export default function FiringTab({ firing, episodes, rules, hostNames, now, onEditRule, canWrite = false, onDismiss, onCreateRule }: Props) {
   const format = useFormat();
   const [open, setOpen] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -250,7 +252,23 @@ export default function FiringTab({ firing, episodes, rules, hostNames, now, onE
         </h2>
         {firing.length === 0 ? (
           <div className="rounded-2xl border border-line bg-panel">
-            <EmptyState compact icon={BellRing} title="Nothing is firing" />
+            {rules.length === 0 ? (
+              <EmptyState
+                compact
+                icon={BellRing}
+                title="No alert rules, so nothing can fire"
+                description="Needs attention on the overview is worked out from traffic and does not alert. Add a rule, such as Error rate or WAF block spike, to be notified."
+                action={
+                  canWrite && onCreateRule ? (
+                    <Button type="button" size="sm" onClick={onCreateRule}>
+                      New rule
+                    </Button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <EmptyState compact icon={BellRing} title="Nothing is firing" />
+            )}
           </div>
         ) : (
           firing.map((alert) => (

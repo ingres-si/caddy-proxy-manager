@@ -24,6 +24,8 @@ export type AttentionItem = {
   actions: AttentionAction[];
   /** When it started or happened; newer items of the same severity come first. */
   at: string | null;
+  /** The reader may hide it from their own list (POST /api/v1/overview/attention/dismissals; filled in by the registry). */
+  dismissible: boolean;
 };
 
 export type AttentionContext = {
@@ -41,8 +43,14 @@ export interface AttentionProvider {
    * only returns items about the reader).
    */
   permissions: readonly Permission[];
-  /** The items for this reader; may return items without `source` (the registry sets it). */
-  collect(context: AttentionContext): Promise<Omit<AttentionItem, "source">[]>;
+  /**
+   * Readers may hide its items from their own list for a while
+   * (dismissals.ts). Meant for items that say what happened, not for
+   * states that stay until someone fixes them.
+   */
+  dismissible?: boolean;
+  /** The items for this reader; may return items without `source` and `dismissible` (the registry sets them). */
+  collect(context: AttentionContext): Promise<Omit<AttentionItem, "source" | "dismissible">[]>;
 }
 
 export type AttentionSourceStatus = { id: string; label: string; status: "ok" | "error" | "timeout"; items: number };
@@ -53,6 +61,8 @@ export type AttentionView = {
   /** More items than are listed. */
   truncated: boolean;
   counts: Record<AttentionSeverity, number>;
+  /** Items the reader dismissed that would otherwise be listed (not in items or counts). */
+  dismissed: number;
   /** The providers the reader may see, and whether each answered. */
   sources: AttentionSourceStatus[];
 };

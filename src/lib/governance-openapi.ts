@@ -215,6 +215,55 @@ export const GOVERNANCE_OPENAPI_PATHS = {
       responses: { "200": { description: "Items", content: json(ref("AttentionView")) }, ...errors("401") },
     },
   },
+  "/api/v1/overview/attention/dismissals": {
+    get: {
+      tags: ["Overview"],
+      summary: "List the caller's dismissed items",
+      description: "The items the caller hid from their own list, still in effect, the ones ending soonest first. Any signed-in user.",
+      operationId: "listAttentionDismissals",
+      responses: {
+        "200": {
+          description: "Dismissals",
+          content: json({ type: "object", properties: { dismissals: { type: "array", items: ref("AttentionDismissal") } } }),
+        },
+        ...errors("401"),
+      },
+    },
+    post: {
+      tags: ["Overview"],
+      summary: "Dismiss an item",
+      description:
+        "Hides an item from the caller's own list for 24 hours, or until it becomes more severe than it is now. Only items listed for the " +
+        "caller now, of sources that allow it (traffic: 5xx bursts, mitigation spikes, blocked-traffic concentrations; dismissible on the " +
+        "item); other sources answer 400, an item not listed 404. Dismissing it again starts the 24 hours again. Other users still see it. " +
+        "Any signed-in user.",
+      operationId: "dismissAttentionItem",
+      requestBody: {
+        required: true,
+        content: json({
+          type: "object",
+          additionalProperties: false,
+          required: ["source", "id"],
+          properties: { source: { type: "string", example: "traffic" }, id: { type: "string", example: "spike:www.example.com" } },
+        }),
+      },
+      responses: { "200": { description: "Dismissal", content: json(ref("AttentionDismissal")) }, ...errors("400", "401", "404") },
+    },
+    delete: {
+      tags: ["Overview"],
+      summary: "List dismissed items again",
+      description: "With source and id, that item; with neither, every item the caller dismissed. Any signed-in user.",
+      operationId: "restoreAttentionItems",
+      parameters: [
+        { name: "source", in: "query", required: false, schema: { type: "string" } },
+        { name: "id", in: "query", required: false, schema: { type: "string" } },
+      ],
+      responses: {
+        "200": { description: "How many dismissals ended", content: json({ type: "object", properties: { restored: { type: "integer" } } }) },
+        ...errors("400", "401"),
+      },
+    },
+  },
 };
 
 export const GOVERNANCE_OPENAPI_SCHEMAS = {
@@ -420,15 +469,27 @@ export const GOVERNANCE_OPENAPI_SCHEMAS = {
             detail: { type: "string" },
             actions: { type: "array", items: { type: "object", properties: { label: { type: "string" }, route: { type: "string" } } } },
             at: { type: ["string", "null"] },
+            dismissible: { type: "boolean", description: "The caller may hide it (POST /api/v1/overview/attention/dismissals)" },
           },
         },
       },
       truncated: { type: "boolean" },
       counts: { type: "object", properties: { critical: { type: "integer" }, warning: { type: "integer" }, info: { type: "integer" } } },
+      dismissed: { type: "integer", description: "Items the caller dismissed that would otherwise be listed (not in items or counts)" },
       sources: {
         type: "array",
         items: { type: "object", properties: { id: { type: "string" }, label: { type: "string" }, status: { type: "string", enum: ["ok", "error", "timeout"] }, items: { type: "integer" } } },
       },
+    },
+  },
+  AttentionDismissal: {
+    type: "object",
+    properties: {
+      source: { type: "string", example: "traffic" },
+      id: { type: "string" },
+      severity: { type: "string", enum: ["critical", "warning", "info"], description: "The item's severity when it was dismissed" },
+      until: { type: "string", format: "date-time" },
+      createdAt: { type: "string", format: "date-time" },
     },
   },
 };

@@ -17,7 +17,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const WARNING_DAYS = 14;
 const INFO_DAYS = 30;
 
-type Item = Omit<AttentionItem, "source">;
+type Item = Omit<AttentionItem, "source" | "dismissible">;
 
 function day(iso: string): string {
   return iso.slice(0, 10);

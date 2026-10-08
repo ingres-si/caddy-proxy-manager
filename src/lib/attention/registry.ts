@@ -2,10 +2,11 @@
  * The attention providers and how their items are collected for a reader.
  * Each provider runs only when the reader holds one of its permissions, with
  * its own time limit; a provider that fails or is slow is reported as such
- * and never hides the others. Items come back most severe first, then
- * newest first.
+ * and never hides the others. Items the reader dismissed (dismissals.ts) are
+ * left out. Items come back most severe first, then newest first.
  */
 import { can, type Access } from "@/src/lib/permissions";
+import { dismissalKey, hides, loadAttentionDismissals, type AttentionDismissal } from "./dismissals";
 import type { AttentionItem, AttentionProvider, AttentionSeverity, AttentionSourceStatus, AttentionView } from "./types";
 
 export const ATTENTION_PROVIDER_TIMEOUT_MS = 4_000;
@@ -54,6 +55,10 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | "timeout">
 export async function collectAttention(access: Access, options: { now?: Date; timeoutMs?: number } = {}): Promise<AttentionView> {
   const now = options.now ?? new Date();
   const readable = listAttentionProviders().filter((provider) => mayRead(provider, access));
+  // Without its dismissals the reader sees every item rather than none.
+  const dismissals: Promise<Map<string, AttentionDismissal>> = readable.some((provider) => provider.dismissible)
+    ? loadAttentionDismissals(access.userId, now).catch(() => new Map())
+    : Promise.resolve(new Map());
   const sources: AttentionSourceStatus[] = [];
   const results = await Promise.all(
     readable.map(async (provider) => {
@@ -70,6 +75,7 @@ export async function collectAttention(access: Access, options: { now?: Date; ti
           title: clean(item.title),
           detail: clean(item.detail),
           actions: item.actions.slice(0, 3),
+          dismissible: provider.dismissible === true,
         }));
       } catch {
         sources.push({ id: provider.id, label: provider.label, status: "error", items: 0 });
@@ -77,7 +83,10 @@ export async function collectAttention(access: Access, options: { now?: Date; ti
       }
     })
   );
-  const items = results.flat().sort((a, b) => RANK[a.severity] - RANK[b.severity] || (b.at ?? "").localeCompare(a.at ?? ""));
+  const hidden = await dismissals;
+  const all = results.flat();
+  const listed = all.filter((item) => !item.dismissible || !hides(hidden.get(dismissalKey(item.source, item.id)), item));
+  const items = listed.sort((a, b) => RANK[a.severity] - RANK[b.severity] || (b.at ?? "").localeCompare(a.at ?? ""));
   const counts: Record<AttentionSeverity, number> = { critical: 0, warning: 0, info: 0 };
   for (const item of items) counts[item.severity] += 1;
   return {
@@ -85,6 +94,7 @@ export async function collectAttention(access: Access, options: { now?: Date; ti
     items: items.slice(0, MAX_ATTENTION_ITEMS),
     truncated: items.length > MAX_ATTENTION_ITEMS,
     counts,
+    dismissed: all.length - listed.length,
     sources: sources.sort((a, b) => a.id.localeCompare(b.id)),
   };
 }

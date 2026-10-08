@@ -144,6 +144,7 @@ export default function AlertsClient({
               onEditRule={(rule) => openEditor(rule)}
               canWrite={canWrite}
               onDismiss={(alert) => openSilence({ kind: "dismiss", alert })}
+              onCreateRule={() => openEditor(null)}
             />
           )}
         </TabsContent>

@@ -2021,6 +2021,30 @@ export const userPreferences = pgTable("user_preferences", {
 });
 
 /**
+ * Items of "Needs attention" an account hid from its own overview
+ * (src/lib/attention/dismissals.ts): the provider and the item's id, the
+ * severity it had, and until when. The item comes back after `until`, or
+ * sooner when its severity rises. Per dashboard, like users: not synced.
+ */
+export const attentionDismissals = pgTable(
+  "attention_dismissals",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    userId: integer("userId")
+      .notNull(),
+    source: text("source").notNull(),
+    itemId: text("itemId").notNull(),
+    /** critical | warning | info */
+    severity: text("severity").notNull(),
+    until: text("until").notNull(),
+    createdAt: text("createdAt").notNull()
+  },
+  (table) => ({
+    itemUnique: uniqueIndex("attention_dismissals_item_unique").on(table.userId, table.source, table.itemId)
+  })
+);
+
+/**
  * The periodic connection check of each enabled LDAP directory
  * (ee/ldap/health.ts): the service account binds and the user search base is
  * searched, every 5 minutes. `lastError` is the description sign-in tests

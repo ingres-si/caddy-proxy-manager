@@ -1,6 +1,6 @@
 {
-  "id": "4da2d295-46f6-487c-b4a1-46e580470763",
-  "prevId": "15a60080-dc13-4ab3-b4fa-bc3fbcfeafef",
+  "id": "5464552a-f259-48e3-8c3f-80e5eaabef66",
+  "prevId": "4da2d295-46f6-487c-b4a1-46e580470763",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -9424,6 +9424,27 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'en-US'"
+        },
+        "proxyHostsSort": {
+          "name": "proxyHostsSort",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'default'"
+        },
+        "l4ProxyHostsSort": {
+          "name": "l4ProxyHostsSort",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'default'"
+        },
+        "clientCertificatesSort": {
+          "name": "clientCertificatesSort",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'default'"
         },
         "updatedAt": {
           "name": "updatedAt",
