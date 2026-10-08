@@ -9,7 +9,7 @@
  * local store stays in use.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import RedisMock from 'ioredis-mock';
+import RedisMock from '../helpers/ioredis-mock';
 import type Redis from 'ioredis';
 import { eq } from 'drizzle-orm';
 import type { TestDb } from '../helpers/db';

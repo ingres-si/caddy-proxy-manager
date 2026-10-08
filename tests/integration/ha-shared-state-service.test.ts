@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
-import RedisMock from 'ioredis-mock';
+import RedisMock from '../helpers/ioredis-mock';
 import type Redis from 'ioredis';
 import { createTestDb, type TestDb } from '../helpers/db';
 import { insertConsumer, insertKey, insertMonetizedHost, insertPlan, insertProxyHost } from '../helpers/monetization';

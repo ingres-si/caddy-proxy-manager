@@ -46,7 +46,10 @@ github.com/corazawaf/coraza-caddy/v2
 github.com/pberkel/caddy-storage-redis
 MODULES
 
-cel_go_version="$(module_version github.com/google/cel-go)"
-set -- "$@" --replace "github.com/google/cel-go=github.com/google/cel-go@$cel_go_version"
+# Set by update-compatibility-pins.sh only while Caddy imports github.com/google/cel-go.
+cel_go_version="$(go list -m -f '{{if .Replace}}{{.Replace.Version}}{{end}}' github.com/google/cel-go 2>/dev/null || true)"
+if [ -n "$cel_go_version" ]; then
+  set -- "$@" --replace "github.com/google/cel-go=github.com/google/cel-go@$cel_go_version"
+fi
 
 GOOS="$TARGETOS" GOARCH="$TARGETARCH" xcaddy build "$@" --output /usr/bin/caddy
