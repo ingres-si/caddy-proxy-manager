@@ -23,13 +23,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { paginate } from "@/src/lib/pagination";
+import { usePreferences } from "@/src/components/preferences/PreferencesProvider";
 import { revokeIssuedClientCertificateAction, revokeIssuedClientCertificatesAction } from "../ca-actions";
 import type { CaCertificateView, IssuedClientCertificateView, MtlsRoleView } from "../page";
 import {
   CLIENT_CERT_SORT_LABELS,
-  DEFAULT_CLIENT_CERT_SORT,
   DEFAULT_SORT_DIRECTION,
   NO_CLIENT_CERT_FILTERS,
+  clientCertSortFromPreference,
   clientCertStatus,
   clientCertStatusCounts,
   filterClientCerts,
@@ -174,7 +175,10 @@ export function ClientCertificatesTab({
   onFiltersChange,
 }: Props) {
   const now = new Date(generatedAt).getTime();
-  const [sort, setSort] = useState<ClientCertSort>(DEFAULT_CLIENT_CERT_SORT);
+  const { preferences } = usePreferences();
+  const [sort, setSort] = useState<ClientCertSort>(
+    () => clientCertSortFromPreference(preferences.clientCertificatesSort)
+  );
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const [revoking, setRevoking] = useState<IssuedClientCertificateView[] | null>(null);

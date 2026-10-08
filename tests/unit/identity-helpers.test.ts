@@ -91,11 +91,25 @@ describe('lookupIpLocation', () => {
 
 describe('interface preferences', () => {
   it('accepts the documented values only', () => {
-    expect(parsePreferencesInput({ theme: 'dark', timeZone: 'Europe/Rome', numberFormat: 'de-DE' }))
-      .toEqual({ theme: 'dark', timeZone: 'Europe/Rome', numberFormat: 'de-DE' });
+    expect(parsePreferencesInput({
+      theme: 'dark',
+      timeZone: 'Europe/Rome',
+      numberFormat: 'de-DE',
+      proxyHostsSort: 'host:asc',
+      l4ProxyHostsSort: 'name:desc',
+      clientCertificatesSort: 'expires:asc',
+    })).toEqual({
+      theme: 'dark',
+      timeZone: 'Europe/Rome',
+      numberFormat: 'de-DE',
+      proxyHostsSort: 'host:asc',
+      l4ProxyHostsSort: 'name:desc',
+      clientCertificatesSort: 'expires:asc',
+    });
     expect(parsePreferencesInput({})).toEqual({});
     for (const body of [null, [], 'dark', { theme: 'blue' }, { timeZone: 'Mars/Olympus' }, { timeZone: '../etc' },
-      { numberFormat: 'xx-XX' }, { language: 'it' }]) {
+      { numberFormat: 'xx-XX' }, { proxyHostsSort: 'host:sideways' }, { l4ProxyHostsSort: 'magic:asc' },
+      { clientCertificatesSort: 'expires:first' }, { language: 'it' }]) {
       expect(() => parsePreferencesInput(body)).toThrow(ApiValidationError);
     }
   });

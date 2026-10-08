@@ -7,6 +7,11 @@
  */
 import type { CertificateKind, RenewalState } from "./certificate-renewal";
 import type { WafEffectiveMode } from "./waf-host-mode";
+import {
+  PROXY_HOST_SORT_KEYS,
+  type ProxyHostSortKey,
+  type SortDirection,
+} from "./list-sort-preferences";
 
 // ── Protections ─────────────────────────────────────────────────────────
 
@@ -319,9 +324,9 @@ export function hostState(enabled: boolean, attention: readonly HostAttention[],
 export const STATUS_FILTERS = ["all", "attention", "disabled"] as const;
 export type StatusFilter = (typeof STATUS_FILTERS)[number];
 
-export const SORT_KEYS = ["requests", "host", "status", "errors", "created"] as const;
-export type SortKey = (typeof SORT_KEYS)[number];
-export type SortDir = "asc" | "desc";
+export const SORT_KEYS = PROXY_HOST_SORT_KEYS;
+export type SortKey = ProxyHostSortKey;
+export type SortDir = SortDirection;
 
 /** Sort keys of the earlier list, still accepted in links. */
 const LEGACY_SORT_KEYS: Record<string, SortKey> = {
@@ -368,7 +373,11 @@ function first(value: string | string[] | undefined): string | undefined {
  * The list's query from the page's search parameters. Sorting by requests
  * needs analytics; without it the list sorts by host name.
  */
-export function parseHostListQuery(params: RawParams, analytics: boolean): HostListQuery {
+export function parseHostListQuery(
+  params: RawParams,
+  analytics: boolean,
+  preferredSort: { key: SortKey; dir: SortDir } | null = null
+): HostListQuery {
   const search = (first(params.search) ?? "").trim().slice(0, 200);
   const statusParam = first(params.status);
   const status: StatusFilter = statusParam === "attention" || statusParam === "disabled" ? statusParam : "all";
@@ -377,10 +386,24 @@ export function parseHostListQuery(params: RawParams, analytics: boolean): HostL
   const rawTags = params.tag;
   const tags = [...new Set((Array.isArray(rawTags) ? rawTags : rawTags ? [rawTags] : []).map((tag) => tag.trim().toLowerCase()).filter(Boolean))].slice(0, 20);
   const sortParam = first(params.sortBy) ?? "";
-  let sortBy: SortKey = (SORT_KEYS as readonly string[]).includes(sortParam) ? (sortParam as SortKey) : LEGACY_SORT_KEYS[sortParam] ?? (analytics ? "requests" : "host");
-  if (!analytics && (sortBy === "requests" || sortBy === "errors")) sortBy = "host";
   const dirParam = first(params.sortDir);
-  const sortDir: SortDir = dirParam === "asc" || dirParam === "desc" ? dirParam : DEFAULT_SORT_DIR[sortBy];
+  const usePreference = sortParam === "" && dirParam === undefined && preferredSort !== null;
+  const preferredKey =
+    usePreference &&
+    preferredSort &&
+    (analytics || (preferredSort.key !== "requests" && preferredSort.key !== "errors"))
+      ? preferredSort.key
+      : null;
+  let sortBy: SortKey = (SORT_KEYS as readonly string[]).includes(sortParam)
+    ? (sortParam as SortKey)
+    : LEGACY_SORT_KEYS[sortParam] ?? preferredKey ?? (analytics ? "requests" : "host");
+  if (!analytics && (sortBy === "requests" || sortBy === "errors")) sortBy = "host";
+  const sortDir: SortDir =
+    dirParam === "asc" || dirParam === "desc"
+      ? dirParam
+      : preferredKey === sortBy && preferredSort
+        ? preferredSort.dir
+        : DEFAULT_SORT_DIR[sortBy];
   const page = Math.max(1, Math.min(100_000, parseInt(first(params.page) ?? "1", 10) || 1));
   return { search, status, protection, tags, sortBy, sortDir, page };
 }

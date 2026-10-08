@@ -4,6 +4,18 @@
  * values and their checks. No database, no Node APIs.
  */
 
+import type {
+  ClientCertificatesSortPreference,
+  L4ProxyHostsSortPreference,
+  ProxyHostsSortPreference,
+} from "./list-sort-preferences";
+
+export type {
+  ClientCertificatesSortPreference,
+  L4ProxyHostsSortPreference,
+  ProxyHostsSortPreference,
+} from "./list-sort-preferences";
+
 export const THEMES = ["system", "dark", "light"] as const;
 export type ThemePreference = (typeof THEMES)[number];
 
@@ -19,12 +31,18 @@ export type UserPreferences = {
   /** An IANA time zone name, such as UTC or Europe/Rome. */
   timeZone: string;
   numberFormat: NumberFormatPreference;
+  proxyHostsSort: ProxyHostsSortPreference;
+  l4ProxyHostsSort: L4ProxyHostsSortPreference;
+  clientCertificatesSort: ClientCertificatesSortPreference;
 };
 
 export const DEFAULT_PREFERENCES: Readonly<UserPreferences> = Object.freeze({
   theme: "system",
   timeZone: "UTC",
   numberFormat: "en-US",
+  proxyHostsSort: "default",
+  l4ProxyHostsSort: "default",
+  clientCertificatesSort: "default",
 });
 
 export function isTheme(value: unknown): value is ThemePreference {

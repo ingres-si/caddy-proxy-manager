@@ -158,6 +158,13 @@ describe('list query', () => {
     expect(parseHostListQuery({ sortBy: 'errors' }, false)).toMatchObject({ sortBy: 'host' });
   });
 
+  it('uses a saved default sort only when the URL does not specify one', () => {
+    expect(parseHostListQuery({}, true, { key: 'host', dir: 'desc' })).toMatchObject({ sortBy: 'host', sortDir: 'desc' });
+    expect(parseHostListQuery({ sortBy: 'created' }, true, { key: 'host', dir: 'desc' })).toMatchObject({ sortBy: 'created', sortDir: 'desc' });
+    expect(parseHostListQuery({ sortDir: 'asc' }, true, { key: 'host', dir: 'desc' })).toMatchObject({ sortBy: 'requests', sortDir: 'asc' });
+    expect(parseHostListQuery({}, false, { key: 'requests', dir: 'desc' })).toMatchObject({ sortBy: 'host', sortDir: 'asc' });
+  });
+
   it('accepts the earlier sort keys and ignores unknown values', () => {
     expect(parseHostListQuery({ sortBy: 'name', sortDir: 'desc' }, true)).toMatchObject({ sortBy: 'host', sortDir: 'desc' });
     expect(parseHostListQuery({ sortBy: 'enabled' }, true)).toMatchObject({ sortBy: 'status', sortDir: 'asc' });

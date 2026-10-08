@@ -1999,7 +1999,8 @@ export const passkeys = pgTable(
 
 /**
  * Interface preferences of an account (src/lib/preferences.ts): theme, time
- * zone and number format. Per dashboard, like users: not synced to slaves.
+ * zone, number format and default list ordering. Per dashboard, like users:
+ * not synced to slaves.
  */
 export const userPreferences = pgTable("user_preferences", {
   userId: integer("userId")
@@ -2010,6 +2011,12 @@ export const userPreferences = pgTable("user_preferences", {
   timeZone: text("timeZone").notNull().default("UTC"),
   /** A locale whose digit grouping and decimal mark numbers use (en-US, de-DE, fr-FR, ...). */
   numberFormat: text("numberFormat").notNull().default("en-US"),
+  /** "default" or "<sort key>:<asc|desc>" for the Proxy Hosts list. */
+  proxyHostsSort: text("proxyHostsSort").notNull().default("default"),
+  /** "default" or "<sort key>:<asc|desc>" for the L4 Proxy Hosts list. */
+  l4ProxyHostsSort: text("l4ProxyHostsSort").notNull().default("default"),
+  /** "default" or "<sort key>:<asc|desc>" for the Client Certificates list. */
+  clientCertificatesSort: text("clientCertificatesSort").notNull().default("default"),
   updatedAt: text("updatedAt").notNull()
 });
 

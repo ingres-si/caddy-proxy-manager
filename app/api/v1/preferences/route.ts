@@ -5,7 +5,7 @@ import { getUserPreferences, parsePreferencesInput, updateUserPreferences } from
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
-/** The caller's interface preferences: theme, time zone and number format. A token with scopes is refused. */
+/** The caller's interface preferences: theme, time zone, number format and list ordering. A token with scopes is refused. */
 export async function GET(request: NextRequest) {
   try {
     const { userId } = await requireApiUser(request);
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** Changes any of theme, timeZone and numberFormat; fields left out keep their values. */
+/** Changes any interface preference; fields left out keep their values. */
 export async function PUT(request: NextRequest) {
   try {
     const { userId } = await requireApiUser(request);

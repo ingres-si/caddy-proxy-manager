@@ -143,6 +143,18 @@ describe('proxy hosts list', () => {
     expect((await listPage({ search: 'charlie', status: 'attention' })).statusCounts).toEqual({ all: 1, attention: 0, disabled: 1 });
   });
 
+  it('uses the saved sort when the URL does not specify one, while explicit URL sorting wins', async () => {
+    await ctx.db.insert(schema.userPreferences).values({
+      userId: ADMIN,
+      proxyHostsSort: 'host:desc',
+      updatedAt: nowIso(),
+    });
+
+    expect((await listPage()).rows.map((row) => row.name)).toEqual(['Charlie', 'Bravo', 'Alpha']);
+    expect((await listPage({ sortBy: 'host', sortDir: 'asc' })).rows.map((row) => row.name))
+      .toEqual(['Alpha', 'Bravo', 'Charlie']);
+  });
+
   it('limits a scoped role to its hosts and hides what it may not read', async () => {
     ctx.sessionUserId = TEAM_A;
     const props = await listPage();

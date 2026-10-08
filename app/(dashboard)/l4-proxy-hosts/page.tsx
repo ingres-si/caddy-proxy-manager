@@ -4,6 +4,8 @@ import { requirePermission } from "@/src/lib/auth";
 import { can, scopeTagsFor } from "@/src/lib/permissions";
 import { getHostApprovalContext } from "@/ee/approvals/requests";
 import { buildL4ListView, parseL4ListQuery } from "./list";
+import { getUserPreferences } from "@/src/lib/preferences";
+import { parseStoredSortPreference } from "@/src/lib/list-sort-preferences";
 
 export const metadata = { title: "L4 hosts" };
 
@@ -12,10 +14,11 @@ interface PageProps {
 }
 
 export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
-  const { access } = await requirePermission("l4_proxy_hosts:read");
+  const { access, user } = await requirePermission("l4_proxy_hosts:read");
   // A tag scope limits the list (and the counts) to hosts with one of the role's tags.
   const scope = scopeTagsFor(access, "l4_proxy_hosts");
-  const query = parseL4ListQuery(await searchParams);
+  const [params, preferences] = await Promise.all([searchParams, getUserPreferences(Number(user.id))]);
+  const query = parseL4ListQuery(params, parseStoredSortPreference(preferences.l4ProxyHostsSort));
 
   // Filtered, counted, sorted and paged in memory: the counts of each filter
   // follow the search and the other filter.

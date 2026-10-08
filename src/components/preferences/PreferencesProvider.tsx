@@ -2,8 +2,9 @@
 
 /**
  * The signed-in account's interface preferences in the browser: theme, time
- * zone and number format (src/lib/preferences.ts). The dashboard layout
- * passes what the server read, so server and browser render the same text.
+ * zone, number format and default ordering of sortable lists
+ * (src/lib/preferences.ts). The dashboard layout passes what the server read,
+ * so server and browser render the same text and list defaults.
  *
  *  - usePreferences(): the preferences and update(), which saves a change
  *    through PUT /api/v1/preferences.

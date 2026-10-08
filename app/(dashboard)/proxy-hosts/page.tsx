@@ -26,6 +26,8 @@ import {
 } from "@/src/lib/proxy-host-view";
 import { paginate } from "@/src/lib/pagination";
 import { getHostApprovalContext } from "@/ee/approvals/requests";
+import { getUserPreferences } from "@/src/lib/preferences";
+import { parseStoredSortPreference } from "@/src/lib/list-sort-preferences";
 
 export const metadata = { title: "Proxy hosts" };
 
@@ -37,11 +39,15 @@ interface PageProps {
 }
 
 export default async function ProxyHostsPage({ searchParams }: PageProps) {
-  const { access } = await requirePermission("proxy_hosts:read");
+  const { access, user } = await requirePermission("proxy_hosts:read");
   // A tag scope limits the list (and the counts) to hosts with one of the role's tags.
   const scope = scopeTagsFor(access, "proxy_hosts");
-  const params = await searchParams;
-  const query = parseHostListQuery(params, can(access, "analytics:read"));
+  const [params, preferences] = await Promise.all([searchParams, getUserPreferences(Number(user.id))]);
+  const query = parseHostListQuery(
+    params,
+    can(access, "analytics:read"),
+    parseStoredSortPreference(preferences.proxyHostsSort)
+  );
 
   const [allHosts, certificates, caCertificates, accessLists, authentikDefaults, forwardAuthDefaults] = await Promise.all([
     listProxyHosts(scope),

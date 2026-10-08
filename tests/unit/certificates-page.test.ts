@@ -16,6 +16,7 @@ import {
 } from '@/app/(dashboard)/certificates/format';
 import { trustAnchorUsage } from '@/app/(dashboard)/certificates/trust';
 import {
+  clientCertSortFromPreference,
   clientCertStatus,
   clientCertStatusCounts,
   filterClientCerts,
@@ -143,6 +144,11 @@ describe('trustAnchorUsage', () => {
 });
 
 describe('client certificate list', () => {
+  it('uses the saved default sort when one is configured', () => {
+    expect(clientCertSortFromPreference('default')).toEqual({ key: 'expires', dir: 'asc' });
+    expect(clientCertSortFromPreference('name:desc')).toEqual({ key: 'name', dir: 'desc' });
+  });
+
   const at = (days: number) => new Date(NOW + days * DAY).toISOString();
   function cert(id: number, overrides: Partial<IssuedClientCertificateView> = {}): IssuedClientCertificateView {
     return {

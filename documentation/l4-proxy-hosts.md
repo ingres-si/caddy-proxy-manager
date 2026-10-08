@@ -12,7 +12,7 @@ An L4 host forwards TCP or UDP traffic that is not HTTP (SSH, mail, DNS over TLS
 - **Tags**, when any host has tags ([host tags](host-tags.md)).
 - **Status**: *Active*, *Disabled*, or *Port not published* when the host is saved but Caddy cannot receive its traffic yet (see [Ports](#ports)).
 
-Search matches names, listen addresses, upstreams, server names and tags, ignoring case. The protocol filter (TCP or UDP) and the status filter (enabled or disabled) narrow the list; each option shows how many hosts it would list with the search and the other filter. The list is sorted newest first; the Name, Listen, Upstream and Status headings sort by that column (on a phone, use the Sort menu). It shows 25 hosts per page, and the page is part of the address, so back, reload and shared links keep it.
+Search matches names, listen addresses, upstreams, server names and tags, ignoring case. The protocol filter (TCP or UDP) and the status filter (enabled or disabled) narrow the list; each option shows how many hosts it would list with the search and the other filter. By default, the list is sorted newest first. **Profile → Interface → Default list order** can change the account's initial ordering; an explicit sort in the URL wins. The Name, Listen, Upstream and Status headings sort by that column (on a phone, use the Sort menu). It shows 25 hosts per page, and the page is part of the address, so back, reload and shared links keep it.
 
 Select a host's name (or **Details** in its row menu) to see all its settings: matcher, load balancing, health checks, TLS, PROXY protocol, geo blocking and DNS. From there, or from the row, you can edit, duplicate, enable or disable it.
 

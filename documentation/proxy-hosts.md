@@ -17,7 +17,7 @@ A proxy host sends the traffic for one or more domains to services on your netwo
 - **Certificate**: days left, issuer and expiry date, and the renewal state when Caddy is renewing it or the renewal fails (from the [certificates](certificates.md) overview; users without `certificates:read` see only whether Caddy obtains it).
 - **Tags**: select one to show only hosts with that tag.
 
-Search matches names, domains, upstreams and tags, ignoring case. The text is matched literally: `%` and `_` are ordinary characters, not wildcards (the L4 Proxy Hosts search works the same way). The status filter shows the hosts that need attention or the disabled ones; the protection and tag filters narrow the list further. The list is sorted by requests in the last 24 hours (by host name without analytics); the Host, Status, Requests and 5xx headings sort by that column.
+Search matches names, domains, upstreams and tags, ignoring case. The text is matched literally: `%` and `_` are ordinary characters, not wildcards (the L4 Proxy Hosts search works the same way). The status filter shows the hosts that need attention or the disabled ones; the protection and tag filters narrow the list further. By default, the list is sorted by requests in the last 24 hours (by host name without analytics). **Profile → Interface → Default list order** can change the account's initial ordering; an explicit sort in the URL wins. The Host, Status, Requests and 5xx headings sort by that column.
 
 The list shows 25 hosts a page, with the pager under it. The page is in the address (`?page=2`), so back, reload and shared links keep it; changing the search, a filter or the sort goes back to the first page.
 

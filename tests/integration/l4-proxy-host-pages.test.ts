@@ -129,6 +129,18 @@ describe('L4 hosts list', () => {
     expect((await listPage({ sortBy: 'listenAddress' })).hosts.map((h) => h.name)).toEqual(['Bravo DNS', 'Alpha SSH', 'Charlie WireGuard']);
   });
 
+  it('uses the saved sort when the URL does not specify one, while explicit URL sorting wins', async () => {
+    await ctx.db.insert(schema.userPreferences).values({
+      userId: ADMIN,
+      l4ProxyHostsSort: 'name:desc',
+      updatedAt: nowIso(),
+    });
+
+    expect((await listPage()).hosts.map((host) => host.name)).toEqual(['Charlie WireGuard', 'Bravo DNS', 'Alpha SSH']);
+    expect((await listPage({ sortBy: 'name', sortDir: 'asc' })).hosts.map((host) => host.name))
+      .toEqual(['Alpha SSH', 'Bravo DNS', 'Charlie WireGuard']);
+  });
+
   it('pages a long list and clamps a page past the end', async () => {
     for (let i = 0; i < 57; i++) await l4Host(`Bulk ${String(i).padStart(2, '0')}`, `:${42000 + i}`, []);
     const second = await listPage({ page: '2', sortBy: 'name' });

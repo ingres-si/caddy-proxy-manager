@@ -3,6 +3,13 @@
  * the filters and the sort. Pure, so the list and its tests share it.
  */
 import type { IssuedClientCertificateView } from "./page";
+import {
+  CLIENT_CERTIFICATE_SORT_KEYS,
+  parseStoredSortPreference,
+  type ClientCertificateSortKey,
+  type ClientCertificatesSortPreference,
+  type SortDirection as ListSortDirection,
+} from "@/src/lib/list-sort-preferences";
 
 const DAY_MS = 86_400_000;
 
@@ -15,11 +22,16 @@ const SERIAL_MIN_LENGTH = 4;
 export type ClientCertStatus = "active" | "expiring" | "expired" | "revoked";
 /** "active" includes the expiring ones. */
 export type ClientCertStatusFilter = "all" | ClientCertStatus;
-export type ClientCertSortKey = "name" | "ca" | "issued" | "expires";
-export type SortDirection = "asc" | "desc";
+export const CLIENT_CERT_SORT_KEYS = CLIENT_CERTIFICATE_SORT_KEYS;
+export type ClientCertSortKey = ClientCertificateSortKey;
+export type SortDirection = ListSortDirection;
 export type ClientCertSort = { key: ClientCertSortKey; dir: SortDirection };
 
 export const DEFAULT_CLIENT_CERT_SORT: ClientCertSort = { key: "expires", dir: "asc" };
+
+export function clientCertSortFromPreference(preference: ClientCertificatesSortPreference): ClientCertSort {
+  return parseStoredSortPreference(preference) ?? DEFAULT_CLIENT_CERT_SORT;
+}
 
 /** The direction a column sorts in when it is picked. */
 export const DEFAULT_SORT_DIRECTION: Record<ClientCertSortKey, SortDirection> = {

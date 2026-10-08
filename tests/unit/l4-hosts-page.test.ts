@@ -87,6 +87,18 @@ describe('L4 hosts list', () => {
     expect(parseL4ListQuery({ sortBy: ['listenAddress', 'name'], sortDir: 'desc' })).toMatchObject({ sortBy: 'listenAddress', sortDir: 'desc' });
   });
 
+  it('uses a saved default sort only when the URL does not specify one', () => {
+    expect(parseL4ListQuery({}, { key: 'name', dir: 'desc' })).toMatchObject({ sortBy: 'name', sortDir: 'desc' });
+    expect(parseL4ListQuery({ sortBy: 'listenAddress' }, { key: 'name', dir: 'desc' })).toMatchObject({
+      sortBy: 'listenAddress',
+      sortDir: 'asc',
+    });
+    expect(parseL4ListQuery({ sortDir: 'asc' }, { key: 'name', dir: 'desc' })).toMatchObject({
+      sortBy: 'createdAt',
+      sortDir: 'asc',
+    });
+  });
+
   it('filters, counts and pages the hosts', () => {
     const hosts = Array.from({ length: 60 }, (_, i) =>
       host({

@@ -6,13 +6,18 @@
  */
 import type { L4ProxyHost } from "@/src/lib/models/l4-proxy-hosts";
 import { paginate, parsePageParam, type PageSlice } from "@/src/lib/pagination";
+import {
+  L4_PROXY_HOST_SORT_KEYS,
+  type L4ProxyHostSortKey,
+  type SortDirection,
+} from "@/src/lib/list-sort-preferences";
 
 export type L4ProtocolFilter = "all" | "tcp" | "udp";
 export type L4StatusFilter = "all" | "enabled" | "disabled";
 
-export const L4_SORT_KEYS = ["name", "protocol", "listenAddress", "upstreams", "enabled", "createdAt"] as const;
-export type L4SortKey = (typeof L4_SORT_KEYS)[number];
-export type L4SortDir = "asc" | "desc";
+export const L4_SORT_KEYS = L4_PROXY_HOST_SORT_KEYS;
+export type L4SortKey = L4ProxyHostSortKey;
+export type L4SortDir = SortDirection;
 
 /** The direction a column sorts in when it is picked. */
 export const L4_DEFAULT_SORT_DIR: Record<L4SortKey, L4SortDir> = {
@@ -54,16 +59,26 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 }
 
 /** The list's state from the URL; anything unknown falls back to the default. */
-export function parseL4ListQuery(params: RawParams): L4ListQuery {
+export function parseL4ListQuery(
+  params: RawParams,
+  preferredSort: { key: L4SortKey; dir: L4SortDir } | null = null
+): L4ListQuery {
   const search = (firstParam(params.search) ?? "").trim().slice(0, 200);
   const protocolParam = firstParam(params.protocol);
   const protocol: L4ProtocolFilter = protocolParam === "tcp" || protocolParam === "udp" ? protocolParam : "all";
   const statusParam = firstParam(params.status);
   const status: L4StatusFilter = statusParam === "enabled" || statusParam === "disabled" ? statusParam : "all";
   const sortParam = firstParam(params.sortBy);
-  const sortBy: L4SortKey = isL4SortKey(sortParam) ? sortParam : "createdAt";
   const dirParam = firstParam(params.sortDir);
-  const sortDir: L4SortDir = dirParam === "asc" || dirParam === "desc" ? dirParam : L4_DEFAULT_SORT_DIR[sortBy];
+  const usePreference = sortParam === undefined && dirParam === undefined && preferredSort !== null;
+  const sortBy: L4SortKey =
+    isL4SortKey(sortParam) ? sortParam : usePreference && preferredSort ? preferredSort.key : "createdAt";
+  const sortDir: L4SortDir =
+    dirParam === "asc" || dirParam === "desc"
+      ? dirParam
+      : usePreference && preferredSort?.key === sortBy
+        ? preferredSort.dir
+        : L4_DEFAULT_SORT_DIR[sortBy];
   return { search, protocol, status, sortBy, sortDir, page: parsePageParam(params.page) };
 }
 

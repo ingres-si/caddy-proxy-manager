@@ -48,7 +48,7 @@ The list shows every client certificate issued here: common name, serial number 
 - **Search** matches the common name, role names, the CA's name and the serial number (from four characters; colons and spaces are ignored, so a short name does not match inside every serial).
 - **Status**: **Active** (valid and not revoked, including the expiring ones), **Expiring** (under 30 days left), **Expired** and **Revoked**, each with its count for the current search.
 - **CA** (with more than one issuing certificate authority) shows the certificates of one CA.
-- **Sort** by common name, CA, issue date or expiry from the column headers (on phones, from the sort menu). The default is the soonest expiry first, with revoked certificates last.
+- **Sort** by common name, CA, issue date or expiry from the column headers (on phones, from the sort menu). The built-in default is the soonest expiry first, with revoked certificates last; **Profile → Interface → Default list order** can change the account's initial ordering.
 
 **Revoke** stops proxy hosts accepting a certificate at once and cannot be undone. To revoke several, tick them (the header checkbox ticks the page; **Select all N matching** then ticks every certificate the search and filters show, across pages) and choose **Revoke** in the bar above the list; a confirmation lists them first. They are revoked as one change: Caddy is applied once, and each certificate gets its own audit event. At most 500 at a time.
 

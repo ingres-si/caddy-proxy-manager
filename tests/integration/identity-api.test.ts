@@ -209,20 +209,62 @@ describe('passkeys', () => {
 describe('interface preferences', () => {
   it('default to the system theme, UTC and en-US, and save valid changes only', async () => {
     expect(await (await preferencesRoute.GET(request('GET', 'alice', '/api/v1/preferences'))).json())
-      .toEqual({ theme: 'system', timeZone: 'UTC', numberFormat: 'en-US' });
+      .toEqual({
+        theme: 'system',
+        timeZone: 'UTC',
+        numberFormat: 'en-US',
+        proxyHostsSort: 'default',
+        l4ProxyHostsSort: 'default',
+        clientCertificatesSort: 'default',
+      });
 
     expect((await preferencesRoute.PUT(request('PUT', 'alice', '/api/v1/preferences', { timeZone: 'Mars/Base' }))).status).toBe(400);
     expect((await preferencesRoute.PUT(request('PUT', 'alice', '/api/v1/preferences', { colour: 'red' }))).status).toBe(400);
+    expect((await preferencesRoute.PUT(request('PUT', 'alice', '/api/v1/preferences', { proxyHostsSort: 'host:sideways' }))).status).toBe(400);
     expect((await preferencesRoute.PUT(request('PUT', 'alice', '/api/v1/preferences'))).status).toBe(400);
 
-    const saved = await (await preferencesRoute.PUT(request('PUT', 'alice', '/api/v1/preferences', { timeZone: 'Europe/Rome', numberFormat: 'de-DE' }))).json();
-    expect(saved).toEqual({ theme: 'system', timeZone: 'Europe/Rome', numberFormat: 'de-DE' });
+    const saved = await (await preferencesRoute.PUT(request('PUT', 'alice', '/api/v1/preferences', {
+      timeZone: 'Europe/Rome',
+      numberFormat: 'de-DE',
+      proxyHostsSort: 'host:asc',
+    }))).json();
+    expect(saved).toEqual({
+      theme: 'system',
+      timeZone: 'Europe/Rome',
+      numberFormat: 'de-DE',
+      proxyHostsSort: 'host:asc',
+      l4ProxyHostsSort: 'default',
+      clientCertificatesSort: 'default',
+    });
     expect(await (await preferencesRoute.GET(request('GET', 'admin', '/api/v1/preferences'))).json()).toMatchObject({ timeZone: 'UTC' });
     expect(audited()).toEqual(['preferences_updated']);
 
     // The same values again change nothing and are not audited.
     await preferencesRoute.PUT(request('PUT', 'alice', '/api/v1/preferences', { timeZone: 'Europe/Rome' }));
     expect(audited()).toEqual(['preferences_updated']);
+  });
+
+  it('falls back to application defaults for corrupt stored sort preferences', async () => {
+    await ctx.db.insert(schema.userPreferences).values({
+      userId: ALICE,
+      theme: 'dark',
+      timeZone: 'Europe/Rome',
+      numberFormat: 'de-DE',
+      proxyHostsSort: 'host:sideways',
+      l4ProxyHostsSort: 'magic:asc',
+      clientCertificatesSort: 'expires:first',
+      updatedAt: now(),
+    });
+
+    expect(await (await preferencesRoute.GET(request('GET', 'alice', '/api/v1/preferences'))).json())
+      .toEqual({
+        theme: 'dark',
+        timeZone: 'Europe/Rome',
+        numberFormat: 'de-DE',
+        proxyHostsSort: 'default',
+        l4ProxyHostsSort: 'default',
+        clientCertificatesSort: 'default',
+      });
   });
 });
 
