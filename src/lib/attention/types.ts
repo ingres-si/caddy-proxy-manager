@@ -24,8 +24,11 @@ export type AttentionItem = {
   actions: AttentionAction[];
   /** When it started or happened; newer items of the same severity come first. */
   at: string | null;
-  /** The reader may hide it from their own list (POST /api/v1/overview/attention/dismissals; filled in by the registry). */
-  dismissible: boolean;
+  /**
+   * An alert firing now (ee/alerting): its rule and subject, so a reader with
+   * alerts:write can dismiss it until it resolves (POST /api/v1/alert-silences).
+   */
+  issue?: { ruleId: number; subjectKey: string };
 };
 
 export type AttentionContext = {
@@ -44,13 +47,13 @@ export interface AttentionProvider {
    */
   permissions: readonly Permission[];
   /**
-   * Readers may hide its items from their own list for a while
-   * (dismissals.ts). Meant for items that say what happened, not for
-   * states that stay until someone fixes them.
+   * Alert rule types (ee/alerting) that report the same problems. While the
+   * reader may read alerts and an enabled rule of one of these types watches
+   * every host, the provider is left out: its problems are listed as alerts.
    */
-  dismissible?: boolean;
-  /** The items for this reader; may return items without `source` and `dismissible` (the registry sets them). */
-  collect(context: AttentionContext): Promise<Omit<AttentionItem, "source" | "dismissible">[]>;
+  supersededBy?: readonly string[];
+  /** The items for this reader; may return items without `source` (the registry sets it). */
+  collect(context: AttentionContext): Promise<Omit<AttentionItem, "source">[]>;
 }
 
 export type AttentionSourceStatus = { id: string; label: string; status: "ok" | "error" | "timeout"; items: number };
@@ -61,8 +64,8 @@ export type AttentionView = {
   /** More items than are listed. */
   truncated: boolean;
   counts: Record<AttentionSeverity, number>;
-  /** Items the reader dismissed that would otherwise be listed (not in items or counts). */
-  dismissed: number;
   /** The providers the reader may see, and whether each answered. */
   sources: AttentionSourceStatus[];
+  /** Whether alert issues are sent anywhere (an enabled rule with an enabled channel); null for readers of no alerts. */
+  notifying: boolean | null;
 };

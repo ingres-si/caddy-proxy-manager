@@ -5,7 +5,8 @@
 import { and, count, eq, gt, inArray, lt, max } from "drizzle-orm";
 import { appDb, toIso } from "@/src/lib/db";
 import { alertEvents, alertRules, alertRuleStates } from "@/src/lib/db/schema";
-import { isRuleType, type AlertEventView, type FiringAlertView, type Severity } from "./types";
+import { isRuleType, type AlertEventView, type FiringAlertView, type RuleType, type Severity } from "./types";
+import { issueLinks } from "./links";
 import { asc, desc } from "@/src/lib/db/ops";
 import { loadActiveSilences, silenceViewsByTarget, subjectId } from "./silences";
 
@@ -88,6 +89,17 @@ export async function listAlertEvents(options: { page: number; perPage: number; 
   return { events: rows.map((row) => toAlertEventView(row, resolutions.get(row.id) ?? null)), total, page: options.page, perPage: options.perPage };
 }
 
+/** The stored facts of an event; {} when there are none or they cannot be read. */
+function parseFacts(value: string | null): Record<string, unknown> {
+  if (!value) return {};
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Every subject firing now, with the event that started it and its
  * dismissal or mute: the ones neither dismissed nor muted first, then most
@@ -142,6 +154,7 @@ export async function listFiringAlerts(): Promise<FiringAlertView[]> {
         notifyOnResolve: state.notifyOnResolve,
         dismissal: silences.dismissals.get(subjectId(state.ruleId, state.subjectKey)) ?? null,
         mute: silences.mutes.get(state.ruleId) ?? null,
+        links: issueLinks(state.ruleType as RuleType, state.subjectKey, parseFacts(event?.facts ?? null)),
       };
     })
     .sort((a, b) => quiet(a) - quiet(b) || rank[a.severity] - rank[b.severity] || (b.firedAt ?? "").localeCompare(a.firedAt ?? ""));

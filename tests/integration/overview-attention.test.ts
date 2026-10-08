@@ -79,8 +79,8 @@ describe('the registry', () => {
     const viewer = await collectAttention(builtInAccess(memberId, 'viewer'));
     expect(viewer.sources.map((source) => source.id)).toEqual(['my_reviews']);
     const custom: Access = { ...builtInAccess(memberId, 'viewer'), customRole: { id: 1, name: 'Analyst' }, permissions: new Set(['analytics:read']) };
-    // The built-in traffic source answers readers of the analytics too.
-    expect((await collectAttention(custom)).sources.map((source) => source.id)).toEqual(['my_reviews', 'test-traffic', 'traffic']);
+    // Traffic is no built-in source: server errors are alerts of the Error rate rule.
+    expect((await collectAttention(custom)).sources.map((source) => source.id)).toEqual(['my_reviews', 'test-traffic']);
   });
 
   it('reports a failing or slow provider without hiding the others, and sorts by severity', async () => {
@@ -104,8 +104,9 @@ describe('the registry', () => {
 
   it('registers the built-in providers', () => {
     expect(listAttentionProviders().map((provider) => provider.id)).toEqual(
-      expect.arrayContaining(['certificates', 'caddy', 'setup', 'traffic', 'identity', 'alerts', 'approvals', 'my_reviews', 'access_reviews', 'fleet', 'backups'])
+      expect.arrayContaining(['certificates', 'caddy', 'setup', 'identity', 'alerts', 'approvals', 'my_reviews', 'access_reviews', 'fleet', 'backups'])
     );
+    expect(listAttentionProviders().map((provider) => provider.id)).not.toContain('traffic');
   });
 });
 
@@ -148,7 +149,14 @@ describe('built-in providers', () => {
       ['critical', 'No valid certificate for auth.example.com'],
       ['warning', 'Certificate "Shop" expires in 4 days'],
     ]);
-    expect(bySource('alerts')).toEqual([expect.objectContaining({ severity: 'critical', title: '5xx at 5.2% on "Mail"', actions: [{ label: 'Open alerts', route: '/alerts' }] })]);
+    expect(bySource('alerts')).toEqual([
+      expect.objectContaining({
+        severity: 'critical',
+        title: '5xx at 5.2% on "Mail"',
+        actions: [{ label: 'Open host', route: '/proxy-hosts/1' }, { label: 'Show requests', route: expect.stringContaining('/analytics?') }],
+        issue: { ruleId: rule.id, subjectKey: 'proxy_host:1' },
+      }),
+    ]);
     expect(bySource('approvals')).toEqual([expect.objectContaining({ severity: 'warning', title: 'Change request #1 waits for your approval' })]);
     expect(bySource('my_reviews')).toEqual([expect.objectContaining({ severity: 'critical', title: '1 access review item waits for your decision' })]);
     expect(bySource('access_reviews')).toEqual([expect.objectContaining({ severity: 'warning', title: 'Access review "Q4" is overdue', actions: [{ label: 'Open the review', route: `/access-reviews/${campaign.id}` }] })]);

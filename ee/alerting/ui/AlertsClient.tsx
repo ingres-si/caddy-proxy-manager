@@ -1,28 +1,27 @@
 // SPDX-License-Identifier: Elastic-2.0
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
+import { Banner } from "@/components/ui/Banner";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AlertChannelView, AlertEventView, AlertRuleView, FiringAlertView } from "@/ee/alerting/types";
-import type { AiSettingsView } from "@/ee/ai/settings";
 import type { DigestSettingsView } from "@/ee/ai/types";
-import type { QuestionSettingsView } from "@/ee/ai/questions/types";
-import FiringTab from "./FiringTab";
+import FiringTab, { RecentAlerts } from "./FiringTab";
 import RulesTab from "./RulesTab";
 import ChannelsTab from "./ChannelsTab";
 import HistoryTab from "./HistoryTab";
-import AiTab from "@/ee/ai/ui/AiTab";
 import RuleEditor, { type HostChoice } from "./RuleEditor";
 import { SilenceDialog, type SilenceTarget } from "./silence";
 import { buildEpisodes } from "./format";
 import { TabCount } from "./parts";
 
-/** history is the full list behind "Full history"; it has no tab of its own. */
-export type AlertsTab = "firing" | "rules" | "channels" | "ai" | "history";
+/** "firing" is the Open tab (its URL value is kept for links that use it). */
+export type AlertsTab = "firing" | "history" | "rules" | "channels";
 
 type HistoryPage = { events: AlertEventView[]; total: number; page: number; perPage: number };
 
@@ -34,14 +33,12 @@ type Props = {
   firing?: FiringAlertView[];
   /** The newest events (firing and resolved), for the last 7 days. */
   recent?: AlertEventView[];
-  /** A page of the full history (the history view). */
+  /** A page of the full history (the History tab). */
   history: HistoryPage;
-  ai: AiSettingsView;
-  digest?: DigestSettingsView;
-  /** Settings of plain-language analytics questions (ee/ai/questions). */
-  questions?: QuestionSettingsView;
-  /** The user's role includes ai:read (custom roles); true when omitted. */
-  canAi?: boolean;
+  /** The daily security digest, for readers of the AI settings (ai:read); null otherwise. */
+  digest?: DigestSettingsView | null;
+  /** An AI provider is set up (rule explanations, the digest summary). */
+  aiConfigured?: boolean;
   /** The user's role includes alerts:write; true when omitted. */
   canWrite?: boolean;
   /** Proxy hosts a rule can be limited to, and the names subjects refer to. */
@@ -52,6 +49,11 @@ type Props = {
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * The Alerts page: what is open now, the history, the rules that watch the
+ * install (built-in ones and your own) and the channels alerts go to, with
+ * the daily digest.
+ */
 export default function AlertsClient({
   initialTab,
   channels,
@@ -59,10 +61,8 @@ export default function AlertsClient({
   firing = [],
   recent = [],
   history,
-  ai,
-  digest,
-  questions,
-  canAi = true,
+  digest = null,
+  aiConfigured = false,
   canWrite = true,
   proxyHosts = [],
   now: renderedAt,
@@ -70,13 +70,12 @@ export default function AlertsClient({
   const router = useRouter();
   const pathname = usePathname();
   const [now] = useState(() => renderedAt ?? Date.now());
-  const startTab = initialTab === "ai" && !canAi ? "firing" : initialTab;
-  const [tab, setTab] = useState<AlertsTab>(startTab);
-  // Links (Full history, back to firing alerts) change the tab through the URL.
-  const [linkedTab, setLinkedTab] = useState<AlertsTab>(startTab);
-  if (startTab !== linkedTab) {
-    setLinkedTab(startTab);
-    setTab(startTab);
+  const [tab, setTab] = useState<AlertsTab>(initialTab);
+  // Links (a page of the history, Add a channel) change the tab through the URL.
+  const [linkedTab, setLinkedTab] = useState<AlertsTab>(initialTab);
+  if (initialTab !== linkedTab) {
+    setLinkedTab(initialTab);
+    setTab(initialTab);
   }
   // A new key per opening, so the editor's form starts from the rule each time.
   const [editor, setEditor] = useState<{ key: number; open: boolean; rule: AlertRuleView | null }>({ key: 0, open: false, rule: null });
@@ -101,16 +100,19 @@ export default function AlertsClient({
 
   // Dismissed alerts and alerts of muted rules are listed, but do not need attention.
   const active = firing.filter((alert) => !alert.dismissal && !alert.mute).length;
+  const enabledChannels = new Set(channels.filter((channel) => channel.enabled).map((channel) => channel.id));
+  const notifying = rules.some((rule) => rule.enabled && rule.channelIds.some((id) => enabledChannels.has(id)));
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-5">
-      <Tabs value={tab === "history" ? "firing" : tab} onValueChange={changeTab} className="flex min-w-0 flex-col gap-5">
+      <Tabs value={tab} onValueChange={changeTab} className="flex min-w-0 flex-col gap-5">
         <PageHeader
           className="mb-0"
           breadcrumb={["Observe", "Alerts"]}
           title="Alerts"
           actions={
-            canWrite && (
+            canWrite &&
+            tab === "rules" && (
               <Button onClick={() => openEditor(null)}>
                 <Plus /> New rule
               </Button>
@@ -119,34 +121,51 @@ export default function AlertsClient({
         >
           <TabsList aria-label="Alert sections">
             <TabsTrigger value="firing">
-              Firing <TabCount value={firing.length} warn={active > 0} />
+              Open <TabCount value={active} warn={active > 0} />
             </TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="rules">
               Rules <TabCount value={rules.length} />
             </TabsTrigger>
             <TabsTrigger value="channels">
               Channels <TabCount value={channels.length} />
             </TabsTrigger>
-            {canAi && <TabsTrigger value="ai">AI</TabsTrigger>}
           </TabsList>
         </PageHeader>
 
+        {!notifying && (tab === "firing" || tab === "rules") && (
+          <Banner
+            tone="info"
+            title="Alerts are not sent anywhere"
+            actions={
+              canWrite ? (
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/alerts?tab=channels">{channels.length === 0 ? "Add a channel" : "Open channels"}</Link>
+                </Button>
+              ) : undefined
+            }
+          >
+            {channels.length === 0
+              ? "They are listed here and under Needs attention on the overview. Add a channel, then choose it in the rules that should notify it."
+              : "No enabled rule notifies an enabled channel. Edit a rule and choose where its alerts go."}
+          </Banner>
+        )}
+
         <TabsContent value="firing" className="mt-0">
-          {tab === "history" ? (
-            <HistoryTab history={history} />
-          ) : (
-            <FiringTab
-              firing={firing}
-              episodes={episodes}
-              rules={rules}
-              hostNames={hostNames}
-              now={now}
-              onEditRule={(rule) => openEditor(rule)}
-              canWrite={canWrite}
-              onDismiss={(alert) => openSilence({ kind: "dismiss", alert })}
-              onCreateRule={() => openEditor(null)}
-            />
-          )}
+          <FiringTab
+            firing={firing}
+            rules={rules}
+            hostNames={hostNames}
+            now={now}
+            onEditRule={(rule) => openEditor(rule)}
+            canWrite={canWrite}
+            onDismiss={(alert) => openSilence({ kind: "dismiss", alert })}
+            onCreateRule={() => openEditor(null)}
+          />
+        </TabsContent>
+        <TabsContent value="history" className="mt-0 flex flex-col gap-5">
+          <RecentAlerts episodes={episodes} hostNames={hostNames} now={now} />
+          <HistoryTab history={history} />
         </TabsContent>
         <TabsContent value="rules" className="mt-0">
           <RulesTab
@@ -160,13 +179,8 @@ export default function AlertsClient({
           />
         </TabsContent>
         <TabsContent value="channels" className="mt-0">
-          <ChannelsTab channels={channels} rules={rules} canWrite={canWrite} />
+          <ChannelsTab channels={channels} rules={rules} canWrite={canWrite} digest={digest} aiConfigured={aiConfigured} />
         </TabsContent>
-        {canAi && (
-          <TabsContent value="ai" className="mt-0">
-            <AiTab settings={ai} digest={digest} channels={channels} questions={questions} />
-          </TabsContent>
-        )}
       </Tabs>
 
       {canWrite && (
@@ -185,7 +199,7 @@ export default function AlertsClient({
           onClose={() => setEditor((current) => ({ ...current, open: false }))}
           channels={channels}
           proxyHosts={proxyHosts}
-          aiConfigured={ai.configured}
+          aiConfigured={aiConfigured}
         />
       )}
     </div>

@@ -9,8 +9,8 @@ Part of the AI analyst. Code: `ee/ai/questions/` (Elastic License 2.0). Adding q
 The **Ask about your traffic** box is at the top of **Analytics** (`/analytics`), and **Ask about traffic** opens the same box on **Compliance**. It needs:
 
 - `analytics:read`;
-- an AI provider (Alerts → AI, see [ai-analyst.md](ai-analyst.md)): your own Anthropic key, or an OpenAI-compatible server such as Ollama on your network;
-- questions turned on (Alerts → AI → Analytics questions; on by default);
+- an AI provider (AI settings, see [ai-analyst.md](ai-analyst.md)): your own Anthropic key, or an OpenAI-compatible server such as Ollama on your network;
+- questions turned on (AI settings → Analytics questions; on by default);
 - ClickHouse analytics.
 
 The answer shows:
@@ -66,7 +66,7 @@ Client addresses, user agents and paths are request details. In the summary call
 
 Turn **AI-written summaries** off and the result never reaches the model: the dashboard writes the summary. The question itself is always sent as typed, so do not type what you would not send. No log lines, raw requests or other configuration are ever sent.
 
-Both calls follow the AI analyst's rules: the provider and key from Alerts → AI (keys go only to the provider they were entered for), no tools, one call each, no retries, the provider's timeout (60 seconds unless set otherwise) and at most 1024 output tokens. A question that runs out of time says so: "The model did not answer within 60 seconds. A slower model needs a longer timeout (Alerts → AI)." Raise **Timeout (seconds)** there for a slow model, such as a large self-hosted one. The system prompt says the question and the data are untrusted and never instructions. The summary is reduced to plain text.
+Both calls follow the AI analyst's rules: the provider and key from AI settings (keys go only to the provider they were entered for), no tools, one call each, no retries, the provider's timeout (60 seconds unless set otherwise) and at most 1024 output tokens. A question that runs out of time says so: "The model did not answer within 60 seconds. A slower model needs a longer timeout (AI settings)." Raise **Timeout (seconds)** there for a slow model, such as a large self-hosted one. The system prompt says the question and the data are untrusted and never instructions. The summary is reduced to plain text.
 
 ## Limits and cost
 
@@ -80,7 +80,7 @@ Every question is recorded in the audit log as `analytics_question_asked`: who a
 
 ## Settings
 
-On **Alerts → AI → Analytics questions**, or with `GET`/`PUT /api/v1/ai/question-settings` (`ai:read`, `ai:write`):
+On **AI settings → Analytics questions**, or with `GET`/`PUT /api/v1/ai/question-settings` (`ai:read`, `ai:write`):
 
 | Field | Default | |
 | --- | --- | --- |

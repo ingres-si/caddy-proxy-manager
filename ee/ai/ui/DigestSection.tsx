@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Elastic-2.0
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -102,7 +103,6 @@ export default function DigestSection({ settings, channels, aiConfigured }: Prop
   return (
     <SectionCard
       title="Daily security digest"
-      className="lg:col-span-2"
       actions={settings.enabled ? <Badge variant="success">On</Badge> : <Badge variant="secondary">Off</Badge>}
       padded
       contentClassName="flex flex-col gap-4"
@@ -144,7 +144,7 @@ export default function DigestSection({ settings, channels, aiConfigured }: Prop
           <div className="space-y-1.5 md:col-span-2">
             <Label>Channels</Label>
             {usable.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Create an alert channel first (PagerDuty channels do not receive digests).</p>
+              <p className="text-sm text-muted-foreground">Add a channel above first (PagerDuty channels do not receive digests).</p>
             ) : (
               <div className="flex flex-wrap gap-x-6 gap-y-2">
                 {usable.map((channel) => (
@@ -163,7 +163,15 @@ export default function DigestSection({ settings, channels, aiConfigured }: Prop
           <label className="flex items-center gap-2 text-sm md:col-span-2">
             <Switch checked={ai} onCheckedChange={setAi} />
             Add an AI-generated summary
-            {!aiConfigured && <span className="text-xs text-muted-foreground">: set up an AI provider above first</span>}
+            {!aiConfigured && (
+              <span className="text-xs text-muted-foreground">
+                (needs an AI provider:{" "}
+                <Link href="/settings/ai" className="text-brand hover:underline">
+                  AI settings
+                </Link>
+                )
+              </span>
+            )}
           </label>
         </fieldset>
         {error && (
@@ -184,6 +192,9 @@ export default function DigestSection({ settings, channels, aiConfigured }: Prop
           <Button variant="outline" onClick={sendNow} disabled={pending || settings.channelIds.length === 0}>
             Send now
           </Button>
+          {settings.channelIds.length === 0 && (
+            <span className="self-center text-xs text-muted-foreground">Choose a channel and save to send one now.</span>
+          )}
         </div>
         <div className="space-y-1 text-xs text-muted-foreground">
           {settings.nextRunAt && (

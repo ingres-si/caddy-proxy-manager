@@ -52,14 +52,16 @@ export default function RulesTab({ rules, channels, canWrite, onCreate, onEdit, 
 
   const channelById = new Map(channels.map((channel) => [channel.id, channel]));
   const needle = search.trim().toLowerCase();
+  // Built-in rules first, then yours (each by name, as listed).
+  const ordered = [...rules].sort((a, b) => Number(b.builtIn !== null) - Number(a.builtIn !== null));
   // Name, condition, scope and channel names.
   const matching = needle
-    ? rules.filter((rule) =>
+    ? ordered.filter((rule) =>
         [rule.name, conditionLine(rule), rule.scopeLabel, ...rule.channelIds.map((id) => channelById.get(id)?.name ?? "")].some((text) =>
           text.toLowerCase().includes(needle)
         )
       )
-    : rules;
+    : ordered;
   const shown = paginate(matching, page);
   const enabledCount = rules.filter((rule) => rule.enabled).length;
 
@@ -153,7 +155,17 @@ export default function RulesTab({ rules, channels, canWrite, onCreate, onEdit, 
                   <TableRow key={rule.id} className={cn("align-top", !rule.enabled && "opacity-60")}>
                     <TableCell className="py-3">
                       <div className="flex flex-col gap-0.5">
-                        <span className="font-semibold">{rule.name}</span>
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-semibold">{rule.name}</span>
+                          {rule.builtIn && (
+                            <span
+                              className="rounded-full border border-line2 px-1.5 text-[11px] leading-4 text-muted-foreground"
+                              title="Comes with Ingressi. Change or disable it; it cannot be deleted."
+                            >
+                              Built-in
+                            </span>
+                          )}
+                        </span>
                         <span className="flex flex-wrap items-center gap-1.5 text-xs text-soft">
                           {conditionLine(rule)}
                           {rule.explain && (
@@ -188,7 +200,9 @@ export default function RulesTab({ rules, channels, canWrite, onCreate, onEdit, 
                     </TableCell>
                     <TableCell className="py-3">
                       {rule.channelIds.length === 0 ? (
-                        <span className="text-muted-foreground">None</span>
+                        <span className="text-muted-foreground" title="Its alerts are listed in Ingressi only">
+                          Not sent
+                        </span>
                       ) : (
                         <span className="flex flex-wrap gap-1">
                           {rule.channelIds.map((id) => {
@@ -209,7 +223,7 @@ export default function RulesTab({ rules, channels, canWrite, onCreate, onEdit, 
                           tone="warn"
                           label={
                             <span className="font-semibold">
-                              {`Firing (${rule.firing.length})${firingSince ? ` since ${format.date(firingSince)}` : ""}`}
+                              {`Open (${rule.firing.length})${firingSince ? ` since ${format.date(firingSince)}` : ""}`}
                             </span>
                           }
                         />
@@ -267,16 +281,21 @@ export default function RulesTab({ rules, channels, canWrite, onCreate, onEdit, 
                         >
                           Edit
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          title="Delete"
-                          aria-label={`Delete rule ${rule.name}`}
-                          disabled={pending}
-                          onClick={() => setConfirmDelete(rule)}
-                        >
-                          <Trash2 />
-                        </Button>
+                        {rule.builtIn ? (
+                          // Keeps the column aligned; built-in rules are disabled, not deleted.
+                          <span aria-hidden="true" className="inline-block size-8 align-middle" />
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            title="Delete"
+                            aria-label={`Delete rule ${rule.name}`}
+                            disabled={pending}
+                            onClick={() => setConfirmDelete(rule)}
+                          >
+                            <Trash2 />
+                          </Button>
+                        )}
                       </TableCell>
                     )}
                   </TableRow>

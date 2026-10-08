@@ -26,7 +26,6 @@ const SEVERITY_TILE: Record<Severity, { icon: LucideIcon; className: string }> =
 
 type Props = {
   firing: FiringAlertView[];
-  episodes: AlertEpisode[];
   rules: AlertRuleView[];
   hostNames: ReadonlyMap<number, string>;
   /** Server time the page was rendered at, for durations that render the same on the server and the client. */
@@ -36,7 +35,7 @@ type Props = {
   canWrite?: boolean;
   /** Opens the dismiss dialog (offered with canWrite). */
   onDismiss?: (alert: FiringAlertView) => void;
-  /** Opens the editor for a new rule (offered with canWrite when there are no rules). */
+  /** Opens the editor for a new rule (offered with canWrite when every rule is disabled). */
   onCreateRule?: () => void;
 };
 
@@ -134,7 +133,7 @@ function FiringCard({ alert, rule, hostNames, now, canEdit, canWrite, onEditRule
           <dd className="m-0">{alert.ruleName}</dd>
         </div>
         <div className="flex flex-col gap-0.5">
-          <dt className="text-xs text-soft">Firing since</dt>
+          <dt className="text-xs text-soft">Open since</dt>
           <dd className="num m-0">
             {alert.firedAt ? `${format.dateTime(alert.firedAt)} · ${formatDuration(now - Date.parse(alert.firedAt))}` : "Unknown"}
           </dd>
@@ -144,7 +143,13 @@ function FiringCard({ alert, rule, hostNames, now, canEdit, canWrite, onEditRule
           <dd className="m-0">
             {alert.deliveries.length === 0 ? (
               <span className="text-muted-foreground">
-                {alert.silenced === "muted" ? "Nobody (rule muted)" : alert.silenced === "dismissed" ? "Nobody (dismissed)" : "Nobody (cooldown or no channel)"}
+                {alert.silenced === "muted"
+                  ? "Nobody (rule muted)"
+                  : alert.silenced === "dismissed"
+                    ? "Nobody (dismissed)"
+                    : rule && rule.channelIds.length === 0
+                      ? "Nobody: the rule notifies no channel"
+                      : "Nobody (cooldown or no channel)"}
               </span>
             ) : (
               <Deliveries deliveries={alert.deliveries} notified />
@@ -236,74 +241,85 @@ function EpisodeDetail({ episode, hostNames }: { episode: AlertEpisode; hostName
   );
 }
 
-export default function FiringTab({ firing, episodes, rules, hostNames, now, onEditRule, canWrite = false, onDismiss, onCreateRule }: Props) {
+export default function FiringTab({ firing, rules, hostNames, now, onEditRule, canWrite = false, onDismiss, onCreateRule }: Props) {
+  const format = useFormat();
+  const ruleById = useMemo(() => new Map(rules.map((rule) => [rule.id, rule])), [rules]);
+  const pending = rules.filter((rule) => rule.enabled).flatMap((rule) => rule.pending.map((item) => ({ rule, item })));
+  const enabled = rules.filter((rule) => rule.enabled).length;
+
+  return (
+    <section aria-labelledby="firing-now-title" className="flex flex-col gap-2.5">
+      <h2 id="firing-now-title" className="m-0 text-base leading-6 font-semibold">
+        Open now
+      </h2>
+      {firing.length === 0 ? (
+        <div className="rounded-2xl border border-line bg-panel">
+          {enabled === 0 ? (
+            <EmptyState
+              compact
+              icon={BellRing}
+              title="Every rule is disabled, so nothing is watched"
+              description="Turn on the built-in rules on the Rules tab, or add your own."
+              action={
+                canWrite && onCreateRule ? (
+                  <Button type="button" size="sm" onClick={onCreateRule}>
+                    New rule
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : (
+            <EmptyState
+              compact
+              icon={BellRing}
+              title="Nothing is open"
+              description={`${enabled} rule${enabled === 1 ? "" : "s"} watch${enabled === 1 ? "es" : ""} this install. What they find is listed here and under Needs attention on the overview until it is fixed.`}
+            />
+          )}
+        </div>
+      ) : (
+        firing.map((alert) => (
+          <FiringCard
+            key={`${alert.ruleId}:${alert.subjectKey}`}
+            alert={alert}
+            rule={ruleById.get(alert.ruleId)}
+            hostNames={hostNames}
+            now={now}
+            canEdit={canWrite && ruleById.has(alert.ruleId)}
+            canWrite={canWrite}
+            onEditRule={onEditRule}
+            onDismiss={onDismiss}
+          />
+        ))
+      )}
+      {pending.length > 0 && (
+        <p className="m-0 text-[13px] text-muted-foreground">
+          Waiting out a &quot;for&quot; duration:{" "}
+          {pending.slice(0, 5).map(({ rule, item }, index) => (
+            <Fragment key={`${rule.id}:${item.subjectKey}`}>
+              {index > 0 && "; "}
+              <span className="text-foreground">{item.title ?? item.subjectKey}</span> ({rule.name}
+              {item.since ? `, since ${format.time(item.since)}` : ""})
+            </Fragment>
+          ))}
+          {pending.length > 5 ? ` and ${pending.length - 5} more` : ""}.
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** The alerts of the last 7 days, one row per episode (fired, then resolved), newest first. */
+export function RecentAlerts({ episodes, hostNames, now }: { episodes: AlertEpisode[]; hostNames: ReadonlyMap<number, string>; now: number }) {
   const format = useFormat();
   const [open, setOpen] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const shown = paginate(episodes, page);
-  const ruleById = useMemo(() => new Map(rules.map((rule) => [rule.id, rule])), [rules]);
-  const pending = rules.filter((rule) => rule.enabled).flatMap((rule) => rule.pending.map((item) => ({ rule, item })));
 
   return (
-    <div className="flex flex-col gap-5">
-      <section aria-labelledby="firing-now-title" className="flex flex-col gap-2.5">
-        <h2 id="firing-now-title" className="m-0 text-base leading-6 font-semibold">
-          Firing now
-        </h2>
-        {firing.length === 0 ? (
-          <div className="rounded-2xl border border-line bg-panel">
-            {rules.length === 0 ? (
-              <EmptyState
-                compact
-                icon={BellRing}
-                title="No alert rules, so nothing can fire"
-                description="Needs attention on the overview is worked out from traffic and does not alert. Add a rule, such as Error rate or WAF block spike, to be notified."
-                action={
-                  canWrite && onCreateRule ? (
-                    <Button type="button" size="sm" onClick={onCreateRule}>
-                      New rule
-                    </Button>
-                  ) : undefined
-                }
-              />
-            ) : (
-              <EmptyState compact icon={BellRing} title="Nothing is firing" />
-            )}
-          </div>
-        ) : (
-          firing.map((alert) => (
-            <FiringCard
-              key={`${alert.ruleId}:${alert.subjectKey}`}
-              alert={alert}
-              rule={ruleById.get(alert.ruleId)}
-              hostNames={hostNames}
-              now={now}
-              canEdit={canWrite && ruleById.has(alert.ruleId)}
-              canWrite={canWrite}
-              onEditRule={onEditRule}
-              onDismiss={onDismiss}
-            />
-          ))
-        )}
-        {pending.length > 0 && (
-          <p className="m-0 text-[13px] text-muted-foreground">
-            Waiting out a &quot;for&quot; duration:{" "}
-            {pending.slice(0, 5).map(({ rule, item }, index) => (
-              <Fragment key={`${rule.id}:${item.subjectKey}`}>
-                {index > 0 && "; "}
-                <span className="text-foreground">{item.title ?? item.subjectKey}</span> ({rule.name}
-                {item.since ? `, since ${format.time(item.since)}` : ""})
-              </Fragment>
-            ))}
-            {pending.length > 5 ? ` and ${pending.length - 5} more` : ""}.
-          </p>
-        )}
-      </section>
-
       <SectionCard
         title="Last 7 days"
         count={episodes.length > 0 ? episodes.length : null}
-        link={{ label: "Full history", href: "/alerts?tab=history" }}
         footer={
           shown.pageCount > 1 ? (
             <Pagination
@@ -362,7 +378,7 @@ export default function FiringTab({ firing, episodes, rules, hostNames, now, onE
                         {episode.resolvedAt ? (
                           <StatusDot tone="ok" label={<span className="num">{format.time(episode.resolvedAt)}</span>} />
                         ) : (
-                          <StatusDot tone="warn" label={<span className="font-semibold">Firing</span>} />
+                          <StatusDot tone="warn" label={<span className="font-semibold">Open</span>} />
                         )}
                       </TableCell>
                       <TableCell className="num text-right whitespace-nowrap">
@@ -386,6 +402,5 @@ export default function FiringTab({ firing, episodes, rules, hostNames, now, onE
           </Table>
         )}
       </SectionCard>
-    </div>
   );
 }

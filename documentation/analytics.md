@@ -126,13 +126,15 @@ The proxy hosts list and a host's page show the traffic of the Host names the ho
 
 Mitigated requests by source over time come from the outcomes above. Top WAF rules and source addresses come from the WAF events, which also hold detection-only matches; the source addresses add the requests the other rules stopped. The event list merges WAF events and requests stopped by geo, access, sign-in and rate limit rules. The [Security events](security-events.md) page shows them all.
 
-## Needs attention
+## Traffic signals
 
-The overview lists, at most five of each:
+The overview's figures, each proxy host's page and `GET /signals` use these signals, at most five of each:
 
 - **5xx bursts**: in the last 24 hours, runs of minutes in which a host answered with 5xx (gaps of up to 2 minutes join runs), with at least 10 such responses and at least 10% of the host's requests in those minutes. Each shows the count, the first and last 5xx, the most frequent status, method and path, and whether it is still going on (a 5xx in the last 5 minutes).
 - **Mitigation spikes**: hosts with at least 50 mitigated requests in the last 24 hours and three times their daily average over the 7 days before.
 - **Blocked-traffic concentrations**: a host, path and outcome with at least 50 mitigated requests in the last 24 hours, with the countries they came from and, for WAF blocks, the rule.
+
+Spikes and concentrations leave out sign-in redirects: a busy login page is no blocked traffic. The overview's **Needs attention** list does not use these signals; server errors there are alerts of the built-in Error rate rule ([needs-attention.md](needs-attention.md)).
 
 ## Saved views
 
@@ -160,7 +162,7 @@ All under `/api/v1/analytics`, with permission `analytics:read`. The reference i
 | `GET /hosts` | Per-host summaries with sparklines (`ids` to limit them). |
 | `GET /hosts/{id}` | One proxy host's summary. |
 | `GET /security/series`, `/security/rules`, `/security/sources`, `/security/hosts`, `/security/events` | Security events: mitigated requests by source with the peak explained, top rules, sources and hosts, and the event list (`kind`, `filters` on host, path, country, ip, method and waf_rule). |
-| `GET /signals` | The "Needs attention" signals. |
+| `GET /signals` | The traffic signals: 5xx bursts, mitigation spikes and blocked-traffic concentrations. |
 | `GET, POST /views`, `GET, PATCH, DELETE /views/{id}` | Saved views. |
 | `POST /questions`, `/questions/saved...` | Plain-language questions and saved questions (see [Analytics questions](../ee/docs/analytics-questions.md)). |
 

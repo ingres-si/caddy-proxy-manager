@@ -17,7 +17,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const WARNING_DAYS = 14;
 const INFO_DAYS = 30;
 
-type Item = Omit<AttentionItem, "source" | "dismissible">;
+type Item = Omit<AttentionItem, "source">;
 
 function day(iso: string): string {
   return iso.slice(0, 10);
@@ -31,6 +31,7 @@ export const certificatesProvider: AttentionProvider = {
   id: "certificates",
   label: "Certificates",
   permissions: ["certificates:read"],
+  supersededBy: ["cert_expiring"],
   async collect({ access, now }) {
     const items: Item[] = [];
     const view = [{ label: "View certificates", route: "/certificates" }];
@@ -117,6 +118,7 @@ export const caddyApplyProvider: AttentionProvider = {
   id: "caddy",
   label: "Caddy",
   permissions: ["settings:read"],
+  supersededBy: ["caddy_apply_failed"],
   async collect() {
     const status = await getCaddyApplyStatus();
     if (!status || status.ok) return [];

@@ -697,6 +697,12 @@ export const alertChannels = sqliteTable("alert_channels", {
 
 export const alertRules = sqliteTable("alert_rules", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  /**
+   * Key of a built-in rule (ee/alerting/builtins.ts), e.g. "certificates";
+   * null for rules people created. Built-in rules can be changed and
+   * disabled, not deleted.
+   */
+  builtIn: text("builtIn"),
   name: text("name").notNull(),
   type: text("type").notNull(),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
@@ -713,7 +719,9 @@ export const alertRules = sqliteTable("alert_rules", {
   forMinutes: integer("forMinutes").notNull().default(0),
   createdAt: text("createdAt").notNull(),
   updatedAt: text("updatedAt").notNull()
-});
+}, (table) => ({
+  builtInUnique: uniqueIndex("alert_rules_built_in_unique").on(table.builtIn)
+}));
 
 /** Per rule and subject (a certificate, an upstream, ...): firing or not, and when it last notified. */
 export const alertRuleStates = sqliteTable(
@@ -2038,31 +2046,6 @@ export const userPreferences = sqliteTable("user_preferences", {
   clientCertificatesSort: text("clientCertificatesSort").notNull().default("default"),
   updatedAt: text("updatedAt").notNull()
 });
-
-/**
- * Items of "Needs attention" an account hid from its own overview
- * (src/lib/attention/dismissals.ts): the provider and the item's id, the
- * severity it had, and until when. The item comes back after `until`, or
- * sooner when its severity rises. Per dashboard, like users: not synced.
- */
-export const attentionDismissals = sqliteTable(
-  "attention_dismissals",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: integer("userId")
-      .references(() => users.id, { onDelete: "cascade" })
-      .notNull(),
-    source: text("source").notNull(),
-    itemId: text("itemId").notNull(),
-    /** critical | warning | info */
-    severity: text("severity").notNull(),
-    until: text("until").notNull(),
-    createdAt: text("createdAt").notNull()
-  },
-  (table) => ({
-    itemUnique: uniqueIndex("attention_dismissals_item_unique").on(table.userId, table.source, table.itemId)
-  })
-);
 
 /**
  * The periodic connection check of each enabled LDAP directory

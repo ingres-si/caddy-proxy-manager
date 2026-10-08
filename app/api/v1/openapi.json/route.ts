@@ -2480,13 +2480,30 @@ const spec = {
         },
       },
     },
+    "/api/v1/alert-channels/test": {
+      post: {
+        tags: ["Alerting"],
+        summary: "Test a channel before saving it",
+        description: "Sends a test notification to the channel described by the body (as for creating one) without saving it. Delivery failures are reported in the body (200 with ok=false).",
+        operationId: "testNewAlertChannel",
+        requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/AlertChannelInput" } } } },
+        responses: {
+          "200": { description: "Delivery result", content: { "application/json": { schema: { $ref: "#/components/schemas/AlertDeliveryResult" } } } },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+    },
     "/api/v1/alert-channels/{id}/test": {
       post: {
         tags: ["Alerting"],
         summary: "Send a test notification",
-        description: "Delivery failures are reported in the body (200 with ok=false).",
+        description:
+          "Without a body, tests the stored channel. With a body (name and config fields, as for an update), tests the channel with those changes over its stored credentials, without saving them. Delivery failures are reported in the body (200 with ok=false).",
         operationId: "testAlertChannel",
         parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        requestBody: { required: false, content: { "application/json": { schema: { $ref: "#/components/schemas/AlertChannelInput" } } } },
         responses: {
           "200": { description: "Delivery result", content: { "application/json": { schema: { $ref: "#/components/schemas/AlertDeliveryResult" } } } },
           "401": { $ref: "#/components/responses/Unauthorized" },
@@ -2552,7 +2569,7 @@ const spec = {
       delete: {
         tags: ["Alerting"],
         summary: "Delete an alert rule",
-        description: "The rule's history is kept.",
+        description: "The rule's history is kept. Built-in rules (builtIn set) cannot be deleted; disable them instead (409).",
         operationId: "deleteAlertRule",
         parameters: [{ $ref: "#/components/parameters/IdPath" }],
         responses: {
@@ -2560,6 +2577,7 @@ const spec = {
           "401": { $ref: "#/components/responses/Unauthorized" },
           "403": { $ref: "#/components/responses/Forbidden" },
           "404": { $ref: "#/components/responses/NotFound" },
+          "409": { $ref: "#/components/responses/Conflict" },
         },
       },
     },
@@ -4969,6 +4987,10 @@ const spec = {
         type: "object",
         properties: {
           id: { type: "integer" },
+          builtIn: {
+            type: ["string", "null"],
+            description: "Key of a built-in rule (every install has them; they notify nobody until channels are added); null for rules people created. Built-in rules can be changed and disabled, not deleted.",
+          },
           name: { type: "string" },
           type: { type: "string", enum: ["cert_expiring", "upstream_down", "waf_spike", "error_rate", "instance_sync_failed", "caddy_apply_failed", "backup_failed", "approval_pending", "access_review_started", "access_review_overdue", "fleet_drift", "fleet_rollout_failed"] },
           enabled: { type: "boolean" },
@@ -5085,6 +5107,11 @@ const spec = {
           notifyOnResolve: { type: "boolean" },
           dismissal: { oneOf: [{ $ref: "#/components/schemas/AlertSilence" }, { type: "null" }], description: "The alert's dismissal in effect" },
           mute: { oneOf: [{ $ref: "#/components/schemas/AlertSilence" }, { type: "null" }], description: "Its rule's mute in effect" },
+          links: {
+            type: "array",
+            description: "Dashboard pages that deal with it, each with the permission needed to open it",
+            items: { type: "object", properties: { label: { type: "string" }, route: { type: "string" }, permission: { type: "string" } } },
+          },
         },
       },
       AlertRuleInput: {

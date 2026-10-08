@@ -246,6 +246,7 @@ function toView(row: RuleRow, states: RuleStatesView, lastFiredAt: string | null
   const scope = SCOPED_RULE_TYPES.includes(type) ? parseStoredScope(row.scope) : ALL;
   return {
     id: row.id,
+    builtIn: row.builtIn ?? null,
     name: row.name,
     type,
     enabled: row.enabled,
@@ -426,6 +427,7 @@ export async function updateAlertRule(id: number, body: unknown, actorUserId: nu
 export async function deleteAlertRule(id: number, actorUserId: number): Promise<void> {
   const row = await getRuleRow(id);
   if (!row) throw notFound();
+  if (row.builtIn) throw new ApiClientError("Built-in alert rules cannot be deleted; disable the rule instead", 409);
   // A rule of a type that no longer exists can still be deleted.
   const type = row.type;
   const label = isRuleType(type) ? RULE_TYPE_LABELS[type] : type;

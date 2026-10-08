@@ -265,7 +265,7 @@ export async function askQuestion(access: Access, body: unknown, overrides: Part
   const question = parseQuestionText((body as Record<string, unknown>).question);
   const settings = await requireQuestionsOn();
   const provider = await deps.provider().catch(() => null);
-  if (!provider) throw new ApiValidationError("Enable and configure an AI provider first (Alerts → AI)");
+  if (!provider) throw new ApiValidationError("Enable and configure an AI provider first (AI settings)");
 
   const release = await admitQuestion(access.userId);
   const now = deps.now();

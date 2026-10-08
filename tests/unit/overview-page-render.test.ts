@@ -22,7 +22,7 @@ const GENERATED = '2026-10-03T11:36:00.000Z';
 const START = Date.parse('2026-10-02T12:00:00.000Z') / 1000;
 
 const ALL: OverviewPermissions = {
-  createProxyHost: true, readProxyHosts: true, readAnalytics: true, readSecurity: true, readAlerts: true,
+  createProxyHost: true, readProxyHosts: true, readAnalytics: true, readSecurity: true, readAlerts: true, writeAlerts: true,
   readAuditLog: true, readUsers: true, readSso: true, writeSettings: true,
 };
 const NONE: OverviewPermissions = Object.fromEntries(Object.keys(ALL).map((key) => [key, false])) as OverviewPermissions;
@@ -74,15 +74,16 @@ function data(overrides: Partial<OverviewData> = {}): OverviewData {
       generatedAt: GENERATED,
       truncated: false,
       counts: { critical: 1, warning: 1, info: 0 },
-      dismissed: 0,
-      sources: [{ id: 'traffic', label: 'Traffic', status: 'ok', items: 1 }, { id: 'fleet', label: 'Fleet', status: 'timeout', items: 0 }, { id: 'certificates', label: 'Certificates', status: 'ok', items: 1 }],
+      sources: [{ id: 'alerts', label: 'Alerts', status: 'ok', items: 1 }, { id: 'fleet', label: 'Fleet', status: 'timeout', items: 0 }, { id: 'certificates', label: 'Certificates', status: 'ok', items: 1 }],
+      notifying: false,
       items: [
         {
-          id: 'burst:mail.example.com:1', source: 'traffic', severity: 'critical', title: 'mail.example.com is answering with server errors: 143 since 09:02 UTC',
-          detail: 'Mostly 501 to POST /Microsoft-Server-ActiveSync.', at: GENERATED, dismissible: true,
+          id: '3:proxy_host:7', source: 'alerts', severity: 'critical', title: 'mail.example.com is answering with server errors: 143 since 09:02 UTC',
+          detail: 'Mostly 501 to POST /Microsoft-Server-ActiveSync.', at: GENERATED,
           actions: [{ label: 'Open host', route: '/proxy-hosts/7' }, { label: 'Show requests', route: '/analytics?range=24h&host=mail.example.com&status=5xx' }],
+          issue: { ruleId: 3, subjectKey: 'proxy_host:7' },
         },
-        { id: 'imported:1', source: 'certificates', severity: 'warning', title: 'Certificate "Shop" expires in 4 days', detail: 'Import a renewed certificate.', at: null, dismissible: false, actions: [{ label: 'View certificates', route: '/certificates' }] },
+        { id: 'imported:1', source: 'certificates', severity: 'warning', title: 'Certificate "Shop" expires in 4 days', detail: 'Import a renewed certificate.', at: null, actions: [{ label: 'View certificates', route: '/certificates' }] },
       ],
     },
     traffic: traffic(),
@@ -126,12 +127,14 @@ describe('the overview', () => {
     expect(html).toContain('<span class="sr-only">Critical: </span>mail.example.com is answering with server errors');
     expect(html).toContain('href="/analytics?range=24h&amp;host=mail.example.com&amp;status=5xx"');
     expect(html).toContain('aria-label="Certificate &quot;Shop&quot; expires in 4 days: View certificates"');
-    expect(html).toContain('href="/alerts?tab=rules">Set up alerts<');
+    expect(html).toContain('href="/alerts">Alerts<');
     expect(html).toContain('Fleet did not answer in time');
-    // Traffic items can be dismissed; certificate items cannot.
-    expect(html).toContain('aria-label="Dismiss: mail.example.com is answering with server errors: 143 since 09:02 UTC"');
-    expect(html).not.toContain('aria-label="Dismiss: Certificate');
-    expect(html).not.toContain('Show dismissed');
+    // Alerts can be dismissed until they resolve; other items cannot.
+    expect(html).toContain('aria-label="Dismiss until it resolves: mail.example.com is answering with server errors: 143 since 09:02 UTC"');
+    expect(html.match(/aria-label="Dismiss until it resolves/g)?.length).toBe(1);
+    // Nobody is notified: the footer says so and offers a channel.
+    expect(html).toContain('Alerts are not sent anywhere.');
+    expect(html).toContain('href="/alerts?tab=channels"');
 
     for (const label of ['Requests', 'Mitigated', '5xx error rate', 'Bandwidth']) expect(html).toContain(label);
     expect(html).toContain('61,817');
@@ -161,7 +164,7 @@ describe('the overview', () => {
   it('shows a viewer without permissions what needs their attention and their account', () => {
     const html = render(data({
       permissions: NONE,
-      attention: { generatedAt: GENERATED, truncated: false, counts: { critical: 0, warning: 0, info: 0 }, dismissed: 0, sources: [{ id: 'my_reviews', label: 'Your access reviews', status: 'ok', items: 0 }], items: [] },
+      attention: { generatedAt: GENERATED, truncated: false, counts: { critical: 0, warning: 0, info: 0 }, sources: [{ id: 'my_reviews', label: 'Your access reviews', status: 'ok', items: 0 }], items: [], notifying: null },
       traffic: null, hosts: null, nodes: null, changes: null,
     }));
     expect(html).toContain('Nothing needs attention right now');
@@ -170,15 +173,6 @@ describe('the overview', () => {
     expect(html).not.toContain('Time range');
     expect(html).not.toContain('New proxy host');
     expect(html).not.toContain('Busiest hosts');
-  });
-
-  it('counts the dismissed items and offers to show them again', () => {
-    const html = render(data({
-      attention: { generatedAt: GENERATED, truncated: false, counts: { critical: 0, warning: 0, info: 0 }, dismissed: 3, sources: [], items: [] },
-    }));
-    expect(html).toContain('Nothing needs attention right now');
-    expect(html).toMatch(/data-testid="attention-dismissed-count">3 dismissed items</);
-    expect(html).toContain('Show dismissed');
   });
 
   it('explains that analytics are off instead of showing empty figures', () => {

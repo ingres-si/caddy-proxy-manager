@@ -1,5 +1,6 @@
 /**
- * Traffic signals for the overview's "Needs attention" list:
+ * Traffic signals for the overview's figures, each proxy host's page and
+ * GET /api/v1/analytics/signals:
  *
  * - 5xx bursts: in the last 24 hours, runs of minutes in which a host
  *   answered with 5xx, at least BURST_MIN_ERRORS of them and at least
@@ -13,8 +14,14 @@
  * - Blocked-traffic concentrations: in the last 24 hours, host + path +
  *   outcome groups with at least CONCENTRATION_MIN mitigated requests, with
  *   the countries they came from (and the WAF rule, for WAF blocks).
+ *
+ * Spikes and concentrations leave out sign-in redirects (outcome "auth"): a
+ * login page doing its job is no blocked traffic, however busy it is.
  */
 import { COUNTRY_SQL, MITIGATED_SQL, OUTCOME_SQL, PATH_SQL } from './dimensions';
+
+/** Mitigated, and not a sign-in redirect. */
+const BLOCKED_SQL = `${MITIGATED_SQL} AND (${OUTCOME_SQL}) != 'auth'`;
 import { isOutcome, type Outcome } from './outcome';
 import { num, ratio, selectRows, withAnalytics, type AnalyticsStatus } from './run';
 import { proxyHostForName, type ProxyHostDomains } from './scope';
@@ -139,7 +146,7 @@ export async function getTrafficSignals(
         `SELECT host, countIf(ts >= toDateTime({p_day:UInt32})) AS cur, countIf(ts < toDateTime({p_day:UInt32})) AS before,
                 topKIf(1)(${OUTCOME_SQL}, ts >= toDateTime({p_day:UInt32})) AS top
          FROM traffic_events
-         WHERE ts >= toDateTime({p_week:UInt32}) AND ts < toDateTime({p_now:UInt32}) AND ${MITIGATED_SQL}
+         WHERE ts >= toDateTime({p_week:UInt32}) AND ts < toDateTime({p_now:UInt32}) AND ${BLOCKED_SQL}
          GROUP BY host HAVING cur >= {p_spike_min:UInt32}`,
         { ...params, p_spike_min: SPIKE_MIN_MITIGATED }
       ),
@@ -148,7 +155,7 @@ export async function getTrafficSignals(
                 sumMap([${COUNTRY_SQL}], [toUInt64(1)]) AS by_country, topKIf(1)(waf_rule_id, waf_rule_id != 0) AS rule,
                 sum(count()) OVER (PARTITION BY host) AS host_total
          FROM traffic_events
-         WHERE ts >= toDateTime({p_day:UInt32}) AND ts < toDateTime({p_now:UInt32}) AND ${MITIGATED_SQL}
+         WHERE ts >= toDateTime({p_day:UInt32}) AND ts < toDateTime({p_now:UInt32}) AND ${BLOCKED_SQL}
          GROUP BY host, path, o
          ORDER BY c DESC LIMIT {p_max:UInt32}`,
         { ...params, p_max: 50 }

@@ -628,7 +628,7 @@ export async function evaluateCaddyApplyFailed(): Promise<Evaluation> {
         label: "Caddy config apply failing",
         title: "Applying the configuration to Caddy failed",
         message:
-          `The last attempt to apply the configuration to Caddy failed at ${status.at}: ${status.message ?? status.code}. ` +
+          `The last attempt to apply the configuration to Caddy failed: ${status.message ?? status.code}. ` +
           "Caddy keeps serving its previous configuration, so recent changes are not live.",
         severity: "critical",
         facts: { code: status.code, reason: status.message, failedAt: status.at, consecutiveFailures: status.consecutiveFailures },

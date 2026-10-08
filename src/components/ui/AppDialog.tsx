@@ -18,6 +18,8 @@ type AppDialogProps = {
   submitLabel?: string;
   onSubmit?: () => void;
   isSubmitting?: boolean;
+  /** Shown at the start of the footer, before Cancel (e.g. "Send test"). */
+  extraAction?: ReactNode;
 };
 
 const MAX_WIDTH_CLASS: Record<NonNullable<AppDialogProps["maxWidth"]>, string> = {
@@ -38,6 +40,7 @@ export function AppDialog({
   submitLabel = "Save",
   onSubmit,
   isSubmitting = false,
+  extraAction,
 }: AppDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -46,11 +49,13 @@ export function AppDialog({
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto py-4 px-1">{children}</div>
+        {/* The stable gutter keeps the scrollbar off the fields. */}
+        <div className="flex-1 min-h-0 overflow-y-auto py-4 pl-1 pr-3 [scrollbar-gutter:stable]">{children}</div>
 
         <DialogFooter>
           {actions ?? (
             <>
+              {extraAction && <div className="flex items-center gap-2 sm:mr-auto">{extraAction}</div>}
               <Button variant="outline" onClick={onClose}>
                 Cancel
               </Button>

@@ -1,9 +1,11 @@
 /**
- * Dismissing a firing alert on the E2E stack: a certificate-expiry rule that
+ * Dismissing an open alert on the E2E stack: a certificate-expiry rule that
  * notifies an e-mail channel fires for an imported certificate that expires
- * in two days. Dismissed from
- * the Firing tab, the alert stays listed, marked, and leaves the overview's
- * Needs attention and the sidebar count; Undo brings it back.
+ * in two days (the built-in certificate rule is disabled meanwhile, so only
+ * this rule reports it). Dismissed from the Open tab, the alert stays listed,
+ * marked, and leaves the overview's Needs attention and the sidebar count;
+ * Undo brings it back. Dismissed from Needs attention, the same, with Undo
+ * right there.
  */
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { createSelfSignedServerCertificate } from '../helpers/certs';
@@ -32,17 +34,17 @@ async function sidebarCount(page: Page): Promise<number> {
   return match ? Number(match[1]) : 0;
 }
 
-/** The overview's Needs attention items of `ruleName`. */
-function attentionItems(page: Page, ruleName: string) {
+/** The overview's Needs attention items titled `title`. */
+function attentionItems(page: Page, title: string) {
   return page
     .getByRole('region', { name: 'Needs attention' })
     .getByTestId('attention-list')
     .getByRole('listitem')
-    .filter({ hasText: `Rule "${ruleName}"` });
+    .filter({ hasText: title });
 }
 
 test.describe('Dismissing an alert', () => {
-  test('dismissed from the Firing tab, it leaves Needs attention and the badge until undone', async ({ page }) => {
+  test('dismissed from the Open tab or from Needs attention, it leaves Needs attention and the badge until undone', async ({ page }) => {
     // The evaluator runs a minute apart (half a minute after start-up).
     test.setTimeout(300_000);
     const stamp = Date.now();
@@ -50,8 +52,13 @@ test.describe('Dismissing an alert', () => {
     const ruleName = `Dismiss test ${stamp}`;
     const { certificatePem, privateKeyPem } = createSelfSignedServerCertificate(domain, [domain], 2);
     const created: string[] = [];
+    const rules = (await (await page.request.get(`${API}/alert-rules`)).json()) as { id: number; builtIn: string | null; enabled: boolean }[];
+    const builtIn = rules.find((entry) => entry.builtIn === 'certificates');
 
     try {
+      if (builtIn?.enabled) {
+        expect((await page.request.put(`${API}/alert-rules/${builtIn.id}`, { data: { enabled: false }, headers })).status()).toBe(200);
+      }
       const cert = await page.request.post(`${API}/certificates`, {
         data: { name: `Dismiss ${domain}`, type: 'imported', domainNames: [domain], autoRenew: false, certificatePem, privateKeyPem },
         headers,
@@ -90,7 +97,7 @@ test.describe('Dismissing an alert', () => {
       expect(alert.dismissal).toBeNull();
 
       await page.goto('/');
-      await expect(attentionItems(page, ruleName)).toHaveCount(1);
+      await expect(attentionItems(page, alert.title)).toHaveCount(1);
       const before = await sidebarCount(page);
       expect(before).toBeGreaterThanOrEqual(1);
 
@@ -114,7 +121,7 @@ test.describe('Dismissing an alert', () => {
 
       await page.goto('/');
       await expect(page.getByRole('region', { name: 'Needs attention' })).toBeVisible();
-      await expect(attentionItems(page, ruleName)).toHaveCount(0);
+      await expect(attentionItems(page, alert.title)).toHaveCount(0);
       expect(await sidebarCount(page)).toBe(before - 1);
 
       // Undo: it needs attention again.
@@ -124,10 +131,26 @@ test.describe('Dismissing an alert', () => {
       expect((await ours())!.dismissal).toBeNull();
 
       await page.goto('/');
-      await expect(attentionItems(page, ruleName)).toHaveCount(1);
+      await expect(attentionItems(page, alert.title)).toHaveCount(1);
       expect(await sidebarCount(page)).toBe(before);
+
+      // Dismissed from Needs attention: for everyone, until it resolves; Undo right there.
+      await page.getByRole('button', { name: `Dismiss until it resolves: ${alert.title}` }).click();
+      const status = page.getByRole('region', { name: 'Needs attention' }).getByRole('status');
+      await expect(status).toContainText('Dismissed for everyone until it resolves');
+      await expect(attentionItems(page, alert.title)).toHaveCount(0);
+      await expect
+        .poll(async () => {
+          const current = await ours();
+          return current?.dismissal ? current.dismissal.until : 'not dismissed';
+        })
+        .toBeNull();
+      await status.getByRole('button', { name: 'Undo' }).click();
+      await expect(attentionItems(page, alert.title)).toHaveCount(1);
+      expect((await ours())!.dismissal).toBeNull();
     } finally {
       for (const url of created) await page.request.delete(url, { headers });
+      if (builtIn?.enabled) await page.request.put(`${API}/alert-rules/${builtIn.id}`, { data: { enabled: true }, headers });
     }
   });
 });

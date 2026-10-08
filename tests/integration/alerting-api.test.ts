@@ -469,7 +469,7 @@ describe('AI settings', () => {
     expect(await (await testAi(request('POST'))).json()).toEqual({
       ok: false,
       explanation: null,
-      error: 'The model did not answer within 90 seconds. A slower model needs a longer timeout (Alerts \u2192 AI).',
+      error: 'The model did not answer within 90 seconds. A slower model needs a longer timeout (AI settings).',
     });
   });
 

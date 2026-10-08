@@ -31,7 +31,9 @@ import {
   type NtfyChannelView,
   type PagerDutyChannelView,
 } from "@/ee/alerting/types";
-import { deleteAlertChannelAction, saveAlertChannelAction, setAlertChannelEnabledAction, testAlertChannelAction } from "./actions";
+import DigestSection from "@/ee/ai/ui/DigestSection";
+import type { DigestSettingsView } from "@/ee/ai/types";
+import { deleteAlertChannelAction, saveAlertChannelAction, setAlertChannelEnabledAction, testAlertChannelAction, testAlertChannelDraftAction } from "./actions";
 import { channelDestination } from "./format";
 
 type Form = {
@@ -169,11 +171,15 @@ type Props = {
   rules: AlertRuleView[];
   /** The user holds alerts:write; without it the tab is read-only. */
   canWrite?: boolean;
+  /** The daily security digest (ee/ai), for readers of the AI settings; left out without them. */
+  digest?: DigestSettingsView | null;
+  /** An AI provider is set up (the digest's AI summary). */
+  aiConfigured?: boolean;
 };
 
 type TestOutcome = { ok: boolean; text: string; at: number };
 
-export default function ChannelsTab({ channels, rules, canWrite = true }: Props) {
+export default function ChannelsTab({ channels, rules, canWrite = true, digest = null, aiConfigured = false }: Props) {
   const router = useRouter();
   const format = useFormat();
   const [pending, startTransition] = useTransition();
@@ -205,6 +211,7 @@ export default function ChannelsTab({ channels, rules, canWrite = true }: Props)
     setEditing(null);
     setForm(EMPTY_FORM);
     setError(null);
+    setDraftTest(null);
     setOpen(true);
   }
 
@@ -212,6 +219,7 @@ export default function ChannelsTab({ channels, rules, canWrite = true }: Props)
     setEditing(channel);
     setForm(formFromChannel(channel));
     setError(null);
+    setDraftTest(null);
     setOpen(true);
   }
 
@@ -232,6 +240,19 @@ export default function ChannelsTab({ channels, rules, canWrite = true }: Props)
       toast.success(editing ? "Channel updated" : "Channel created");
       setOpen(false);
       router.refresh();
+    });
+  }
+
+  const [draftTest, setDraftTest] = useState<{ ok: boolean; text: string } | null>(null);
+
+  /** Sends a test to the channel as the dialog has it, without saving. */
+  function sendDraftTest() {
+    setError(null);
+    setDraftTest(null);
+    const input = { name: form.name || undefined, ...(editing ? {} : { type: form.type }), config: configFromForm(form) };
+    startTransition(async () => {
+      const result = await testAlertChannelDraftAction(editing?.id ?? null, input);
+      setDraftTest(result.ok ? { ok: true, text: "Test notification sent. Check that it arrived." } : { ok: false, text: result.error });
     });
   }
 
@@ -293,7 +314,7 @@ export default function ChannelsTab({ channels, rules, canWrite = true }: Props)
       <SectionCard
         title="Channels"
         actions={
-          (channels.length > 0 || canWrite) && (
+          channels.length > 0 && (
             <>
               {channels.length > 0 && (
                 <SearchField
@@ -308,7 +329,7 @@ export default function ChannelsTab({ channels, rules, canWrite = true }: Props)
                   className="w-full sm:w-56"
                 />
               )}
-              {canWrite && (
+              {canWrite && channels.length > 0 && (
                 <Button variant="secondary" size="sm" onClick={openCreate}>
                   <Plus /> Add channel
                 </Button>
@@ -326,6 +347,7 @@ export default function ChannelsTab({ channels, rules, canWrite = true }: Props)
           <EmptyState
             compact
             title="No channels yet"
+            description="A channel is where alerts are sent: e-mail, Slack, Microsoft Teams, a webhook, PagerDuty or ntfy. Until a rule notifies one, its alerts are only listed in Ingressi."
             action={
               canWrite ? (
                 <Button size="sm" onClick={openCreate}>
@@ -448,6 +470,8 @@ export default function ChannelsTab({ channels, rules, canWrite = true }: Props)
         )}
       </SectionCard>
 
+      {digest && <DigestSection settings={digest} channels={channels} aiConfigured={aiConfigured} />}
+
       <AppDialog
         open={open}
         onClose={() => setOpen(false)}
@@ -456,6 +480,11 @@ export default function ChannelsTab({ channels, rules, canWrite = true }: Props)
         onSubmit={save}
         isSubmitting={pending}
         maxWidth="md"
+        extraAction={
+          <Button type="button" variant="outline" onClick={sendDraftTest} disabled={pending}>
+            Send test
+          </Button>
+        }
       >
         <div className="flex flex-col gap-4">
           <Field label="Name" htmlFor="channel-name">
@@ -591,6 +620,11 @@ export default function ChannelsTab({ channels, rules, canWrite = true }: Props)
             <Switch checked={form.enabled} onCheckedChange={(checked) => set("enabled", checked)} />
             Enabled
           </label>
+          {draftTest && (
+            <Banner tone={draftTest.ok ? "ok" : "bad"} live>
+              {draftTest.text}
+            </Banner>
+          )}
           {error && (
             <Banner tone="bad" live>
               {error}

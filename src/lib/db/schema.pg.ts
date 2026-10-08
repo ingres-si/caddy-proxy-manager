@@ -684,6 +684,12 @@ export const alertChannels = pgTable("alert_channels", {
 
 export const alertRules = pgTable("alert_rules", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  /**
+   * Key of a built-in rule (ee/alerting/builtins.ts), e.g. "certificates";
+   * null for rules people created. Built-in rules can be changed and
+   * disabled, not deleted.
+   */
+  builtIn: text("builtIn"),
   name: text("name").notNull(),
   type: text("type").notNull(),
   enabled: boolean("enabled").notNull().default(true),
@@ -700,7 +706,9 @@ export const alertRules = pgTable("alert_rules", {
   forMinutes: integer("forMinutes").notNull().default(0),
   createdAt: text("createdAt").notNull(),
   updatedAt: text("updatedAt").notNull()
-});
+}, (table) => ({
+  builtInUnique: uniqueIndex("alert_rules_built_in_unique").on(table.builtIn)
+}));
 
 /** Per rule and subject (a certificate, an upstream, ...): firing or not, and when it last notified. */
 export const alertRuleStates = pgTable(
@@ -2019,30 +2027,6 @@ export const userPreferences = pgTable("user_preferences", {
   clientCertificatesSort: text("clientCertificatesSort").notNull().default("default"),
   updatedAt: text("updatedAt").notNull()
 });
-
-/**
- * Items of "Needs attention" an account hid from its own overview
- * (src/lib/attention/dismissals.ts): the provider and the item's id, the
- * severity it had, and until when. The item comes back after `until`, or
- * sooner when its severity rises. Per dashboard, like users: not synced.
- */
-export const attentionDismissals = pgTable(
-  "attention_dismissals",
-  {
-    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-    userId: integer("userId")
-      .notNull(),
-    source: text("source").notNull(),
-    itemId: text("itemId").notNull(),
-    /** critical | warning | info */
-    severity: text("severity").notNull(),
-    until: text("until").notNull(),
-    createdAt: text("createdAt").notNull()
-  },
-  (table) => ({
-    itemUnique: uniqueIndex("attention_dismissals_item_unique").on(table.userId, table.source, table.itemId)
-  })
-);
 
 /**
  * The periodic connection check of each enabled LDAP directory

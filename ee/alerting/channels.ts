@@ -419,6 +419,38 @@ export async function updateAlertChannel(id: number, body: unknown, actorUserId:
   return toAlertChannelView(updated);
 }
 
+/**
+ * A channel as it would be saved from `body` (a new channel, or the changes
+ * to channel `id` merged over what is stored), for a test before saving.
+ * Nothing is written; stored credentials are kept unless `body` replaces them.
+ */
+export async function draftChannelRow(id: number | null, body: unknown): Promise<ChannelRow> {
+  const record = requireObject(body, "Request body");
+  rejectUnknownKeys(record, ["name", "type", "enabled", "config"], "the channel");
+  const row = id === null ? null : await getChannelRow(id);
+  if (id !== null && !row) throw notFound();
+  const type = row ? readChannelType(row.type) : readChannelType(record.type);
+  if (row && record.type !== undefined && record.type !== type) {
+    throw new ApiValidationError("The type of an alert channel cannot be changed; create a new channel instead");
+  }
+  const name = record.name !== undefined ? readName(record.name) : row?.name ?? CHANNEL_TYPE_LABELS[type];
+  const existing = row ? { config: parseJsonObject(row.config), secrets: tryDecryptSecrets(row) ?? {} } : null;
+  const settings = normalizeChannelSettings(type, requireObject(record.config ?? {}, "config"), existing);
+  const now = nowIso();
+  return {
+    id: row?.id ?? 0,
+    name,
+    type,
+    enabled: true,
+    config: JSON.stringify(settings.config),
+    secrets: encryptSecrets(settings.secrets),
+    lastDeliveryAt: row?.lastDeliveryAt ?? null,
+    lastDeliveryError: row?.lastDeliveryError ?? null,
+    createdAt: row?.createdAt ?? now,
+    updatedAt: now,
+  };
+}
+
 /** Rules that notify the channel, by name. */
 async function rulesUsingChannel(id: number): Promise<string[]> {
   const rules = await appDb.select({ name: alertRules.name, channelIds: alertRules.channelIds }).from(alertRules).orderBy(alertRules.id);

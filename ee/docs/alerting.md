@@ -1,6 +1,6 @@
 # Alerting
 
-Notifications when something needs attention: certificates about to expire or failing renewal, failing upstreams, WAF block spikes, 5xx error rates, failed instance syncs, failed Caddy config applies, failing scheduled backups, drifted fleet instances and failed fleet rollouts. Configure it on **Alerts** in the dashboard or through `/api/v1/alert-*`.
+What needs fixing, as alerts: certificates about to expire or failing renewal, failing upstreams, WAF block spikes, 5xx error rates, failed instance syncs, failed Caddy config applies, failing scheduled backups, drifted fleet instances and failed fleet rollouts. Every install watches most of these out of the box with [built-in rules](#built-in-rules); what they find is listed on the **Alerts** page and under **Needs attention** on the overview until it is fixed, and is sent to the channels you add. Configure it on **Alerts** in the dashboard or through `/api/v1/alert-*`.
 
 Code: `ee/alerting/` (Elastic License 2.0).
 
@@ -19,20 +19,40 @@ Code: `ee/alerting/` (Elastic License 2.0).
 - A firing alert can be dismissed and a rule muted for a while; see [Dismissing and muting](#dismissing-and-muting).
 - Alerts are not synced to slave instances. A slave keeps no rules unless someone configures them on it directly.
 
+## Built-in rules
+
+Every install has these rules (`builtIn` set in the API). They start without channels: what they find is listed on the Alerts page and under Needs attention, and nothing is sent until you choose channels in them.
+
+| Rule | Type | Starts |
+| --- | --- | --- |
+| Certificates expiring or not renewed | `cert_expiring`, 14 days, client and Caddy-managed certificates too | On |
+| Configuration not applied to Caddy | `caddy_apply_failed` | On |
+| Server errors | `error_rate`, above 5% of at least 20 requests in 5 minutes, one alert per proxy host | On |
+| Upstream failing | `upstream_down`, after 2 minutes | On |
+| Scheduled backup failed | `backup_failed` | On |
+| Instance sync failed | `instance_sync_failed` (master mode only) | On |
+| Fleet rollout failed | `fleet_rollout_failed` (master mode only) | On |
+| Fleet instance drifted | `fleet_drift` (master mode only) | On |
+| WAF block spike | `waf_spike`, 100 blocks in 15 minutes | Off: a host open to the internet sees scans all day; turn it on with a threshold that fits |
+
+They are ordinary rules: change their thresholds, scope, channels and cooldown, or disable them. They cannot be deleted (`DELETE` answers 409). They are added once, when the evaluator first runs after an upgrade or the Alerts page is opened; an install that already had a rule of the same type keeps its own rule and gets no built-in one of that type, and a built-in rule someone disabled stays disabled. A later release that adds built-in rules adds only the new ones.
+
 ## The Alerts page
 
 **Alerts** (Observe group, `/alerts`) has four tabs:
 
-- **Firing**: every subject firing now, with its severity, since when, which channels were told and what happens when it clears, and the subjects waiting out a "for" duration. **Dismiss** on an alert dismisses it or mutes its rule; dismissed alerts and alerts of muted rules are listed after the others, marked, with **Undo**. Under it, the alerts of the last 7 days: select one for what happened (with the AI explanation, labelled as such), who was told when it fired and when it resolved, and links to look closer (the host, certificate or security events it is about, and the audit log around that time). **Full history** (`/alerts?tab=history`, `&page=` for later pages) pages through the 90 days kept, 25 alerts at a time.
-- **Rules**: each rule's condition, scope, "for" duration, usual severity, channels (a channel whose last delivery failed is marked), when it last fired and whether it is on, searchable by name, condition, scope and channel and paged 25 at a time. **Mute…** mutes a rule for a while (the rule then shows "Muted until …" and **Unmute**). **New rule** opens the editor: the condition and its parameters, the hosts it watches (all hosts or chosen ones, for the rule types that accept a scope), the "for" duration, the channels, the cooldown, the resolve notice and the AI explanation.
-- **Channels**: where each channel delivers (the host only, never a credential), how many rules use it, its last delivery and **Send test**, searchable by name, type and destination and paged 25 at a time. A channel whose last delivery failed is also shown in a banner above the table.
-- **AI**: the AI provider for explanations and the daily security digest (permission `ai:read`).
+- **Open** (`/alerts`): every alert open now, with its severity, since when, which channels were told and what happens when it clears, and the subjects waiting out a "for" duration. **Dismiss** on an alert dismisses it or mutes its rule; dismissed alerts and alerts of muted rules are listed after the others, marked, with **Undo**. The same alerts, except dismissed ones and those of muted rules, are the overview's [Needs attention](../../documentation/needs-attention.md) items.
+- **History** (`/alerts?tab=history`): the alerts of the last 7 days, one row per alert from when it opened to when it resolved; select one for what happened (with the AI explanation, labelled as such), who was told when it opened and when it resolved, and links to look closer (the host, certificate or security events it is about, and the audit log around that time). Under it, the event log of the 90 days kept, 25 events at a time (`&page=` for later pages).
+- **Rules** (`/alerts?tab=rules`): the built-in rules first, marked **Built-in**, then yours: each rule's condition, scope, "for" duration, usual severity, channels ("Not sent" without any; a channel whose last delivery failed is marked), when it last fired and whether it is on, searchable by name, condition, scope and channel and paged 25 at a time. **Mute…** mutes a rule for a while (the rule then shows "Muted until …" and **Unmute**). **New rule** opens the editor: the condition and its parameters, the hosts it watches (all hosts or chosen ones, for the rule types that accept a scope), the "for" duration, the channels, the cooldown, the resolve notice and the AI explanation.
+- **Channels** (`/alerts?tab=channels`): where each channel delivers (the host only, never a credential), how many rules use it, its last delivery and **Send test**, searchable by name, type and destination and paged 25 at a time. A channel whose last delivery failed is also shown in a banner above the table. The channel dialog has **Send test** too, for a channel that is not saved yet or for unsaved changes (`POST /api/v1/alert-channels/test`, or `POST /api/v1/alert-channels/{id}/test` with the changes as its body). Under the channels, the [daily security digest](ai-analyst.md#daily-security-digest) (permission `ai:read`).
+
+When no enabled rule notifies an enabled channel, the Open and Rules tabs say that alerts are not sent anywhere. The AI provider is on **AI settings** (`/settings/ai`, under Settings; `/alerts?tab=ai` goes there).
 
 Without `alerts:write` the page is read-only.
 
 ## Dismissing and muting
 
-- **Dismiss** a firing alert (one rule and subject) **until it resolves**: it leaves the overview's "Needs attention" and the sidebar count, and stays on the Firing tab marked "Dismissed" with who did it and the note. When it resolves, the dismissal ends: if it fires again later, it notifies and shows as usual.
+- **Dismiss** a firing alert (one rule and subject) **until it resolves**: it leaves the overview's "Needs attention" and the sidebar count, and stays on the Open tab marked "Dismissed" with who did it and the note. The overview's Needs attention list dismisses an alert this way too, with the button at the end of its line. When it resolves, the dismissal ends: if it fires again later, it notifies and shows as usual.
 - Or dismiss it **for 1 hour, 8 hours, 1 day or 1 week** (the API takes any duration up to 30 days): the same, and if it resolves and fires again before then, no firing notification is sent and it stays out of "Needs attention". The dismissal ends by itself.
 - **Mute** a rule for 1 hour, 8 hours, 1 day or 1 week (up to 30 days through the API), from the Rules tab or with "Mute the whole rule instead" in the dismiss dialog: no firing notifications and nothing in "Needs attention" for any of its alerts until then. To stop a rule for good, disable it.
 - What fires while muted or dismissed is still recorded in the history, as not sent because of the mute or dismissal (`silenced`). Notifications already sent are not taken back: an alert dismissed after its firing notification went out still gets its resolve notice; one whose firing notification a mute or dismissal held back gets none.
@@ -126,7 +146,7 @@ Delivery uses a 10 s timeout and does not follow redirects. Errors are reduced t
 
 ## AI explanations
 
-A rule with `explain: true` asks the AI provider configured on the AI tab for a short plain-language explanation of each firing alert. See [ai-analyst.md](ai-analyst.md).
+A rule with `explain: true` asks the AI provider configured on AI settings for a short plain-language explanation of each firing alert. See [ai-analyst.md](ai-analyst.md).
 
 ## REST API
 

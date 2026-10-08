@@ -327,6 +327,6 @@ describe('incident drafts', () => {
     );
     expect(editor).toContain('AI-generated first draft');
     expect(editor).toContain('Nothing is sent from here');
-    expect(editor).toMatch(/<button[^>]*disabled=""[^>]*title="Configure an AI provider under Alerts → AI first"/);
+    expect(editor).toMatch(/<button[^>]*disabled=""[^>]*title="Configure an AI provider under AI settings first"/);
   });
 });

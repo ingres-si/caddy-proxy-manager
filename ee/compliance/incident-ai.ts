@@ -121,7 +121,7 @@ export async function requestStageDraft(
   } catch {
     provider = null;
   }
-  if (!provider) return { ok: false, error: "Enable and configure an AI provider first (Alerts → AI)", unavailable: true };
+  if (!provider) return { ok: false, error: "Enable and configure an AI provider first (AI settings)", unavailable: true };
   let result;
   try {
     result = await deps.model(provider, buildDraftPrompt(stage, subject), {

@@ -40,8 +40,10 @@ export type OverviewPermissions = {
   readAnalytics: boolean;
   /** waf:read: the security events page. */
   readSecurity: boolean;
-  /** alerts:read: "Alert rules" next to Needs attention. */
+  /** alerts:read: "Alerts" next to Needs attention. */
   readAlerts: boolean;
+  /** alerts:write: dismissing an alert from Needs attention, "Add a channel". */
+  writeAlerts: boolean;
   /** audit_log:read. */
   readAuditLog: boolean;
   /** users:read / users:write: the setup checklist's "Add a user". */

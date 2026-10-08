@@ -96,7 +96,7 @@ class RefusalError extends ProviderError {
 
 /** What a model call that ran out of time reports, with where to give it longer. */
 export function timeoutMessage(seconds: number): string {
-  return `The model did not answer within ${seconds} seconds. A slower model needs a longer timeout (Alerts → AI).`;
+  return `The model did not answer within ${seconds} seconds. A slower model needs a longer timeout (AI settings).`;
 }
 
 function describeError(error: unknown, refusalMessage: string, timeoutSeconds: number): string {

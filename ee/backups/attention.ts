@@ -12,6 +12,7 @@ export const backupsAttentionProvider: AttentionProvider = {
   id: "backups",
   label: "Backups",
   permissions: ["backups:read"],
+  supersededBy: ["backup_failed"],
   async collect() {
     const rows = await appDb
       .select()

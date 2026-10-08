@@ -90,7 +90,6 @@ export const wafRuleExclusions = tables.wafRuleExclusions;
 export const accessListRules = tables.accessListRules;
 export const passkeys = tables.passkeys;
 export const userPreferences = tables.userPreferences;
-export const attentionDismissals = tables.attentionDismissals;
 export const ldapDirectoryHealth = tables.ldapDirectoryHealth;
 export const complianceReportSchedules = tables.complianceReportSchedules;
 export const complianceRestoreTests = tables.complianceRestoreTests;

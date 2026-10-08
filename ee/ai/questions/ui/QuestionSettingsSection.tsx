@@ -14,10 +14,12 @@ import { saveQuestionSettingsAction } from "@/ee/alerting/ui/actions";
 type Props = {
   settings: QuestionSettingsView;
   aiConfigured: boolean;
+  /** ai:write; without it the form is read-only. */
+  canWrite?: boolean;
 };
 
-/** Settings of plain-language analytics questions (ee/ai/questions), on Alerts → AI. */
-export default function QuestionSettingsSection({ settings, aiConfigured }: Props) {
+/** Settings of plain-language analytics questions (ee/ai/questions), on AI settings. */
+export default function QuestionSettingsSection({ settings, aiConfigured, canWrite = true }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState<QuestionSettingsView>(settings);
@@ -38,18 +40,19 @@ export default function QuestionSettingsSection({ settings, aiConfigured }: Prop
     });
   }
 
-  const toggle = (key: keyof QuestionSettingsView, label: string, hint?: string) => (
+  // The hint says what the switch does as it is set now.
+  const toggle = (key: keyof QuestionSettingsView, label: string, hint?: (on: boolean) => string) => (
     <label className="flex items-start gap-3 text-sm">
       <Switch
         className="mt-0.5"
         checked={form[key]}
         onCheckedChange={(checked) => setForm({ ...form, [key]: checked })}
-        disabled={pending}
+        disabled={pending || !canWrite}
         aria-label={label}
       />
       <span className="flex flex-col gap-0.5">
         <span>{label}</span>
-        {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+        {hint && <span className="text-xs text-muted-foreground">{hint(form[key])}</span>}
       </span>
     </label>
   );
@@ -61,12 +64,14 @@ export default function QuestionSettingsSection({ settings, aiConfigured }: Prop
       contentClassName="flex flex-col gap-4"
     >
       {!aiConfigured && <p className="m-0 text-[13px] text-muted-foreground">Set up the AI provider first.</p>}
-      {toggle("enabled", "Let users ask questions", "Questions are recorded in the audit log.")}
-      {toggle("aiSummaries", "AI-written summaries", "Off, the result is never sent to the model.")}
-      {toggle(
-        "shareRequestDetails",
-        "Send client addresses, user agents and paths when a question needs them",
-        "Off, the model sees placeholders. The question is always sent as typed."
+      {toggle("enabled", "Let users ask questions", () => "Questions are recorded in the audit log.")}
+      {toggle("aiSummaries", "AI-written summaries", (on) =>
+        on ? "The model reads the result and writes a short summary of it." : "The result is never sent to the model."
+      )}
+      {toggle("shareRequestDetails", "Send client addresses, user agents and paths when a question needs them", (on) =>
+        on
+          ? "The model sees them when a question needs them. The question is always sent as typed."
+          : "The model sees placeholders instead. The question is always sent as typed."
       )}
       {error && (
         <Banner tone="bad" live>
@@ -74,7 +79,7 @@ export default function QuestionSettingsSection({ settings, aiConfigured }: Prop
         </Banner>
       )}
       <div>
-        <Button onClick={save} disabled={pending || !changed}>
+        <Button onClick={save} disabled={pending || !changed || !canWrite}>
           Save
         </Button>
       </div>

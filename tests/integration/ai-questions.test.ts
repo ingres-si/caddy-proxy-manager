@@ -270,7 +270,7 @@ describe('asking', () => {
   });
 
   it('reports a provider failure as 502 and audits it', async () => {
-    const timedOut = 'The model did not answer within 60 seconds. A slower model needs a longer timeout (Alerts \u2192 AI).';
+    const timedOut = 'The model did not answer within 60 seconds. A slower model needs a longer timeout (AI settings).';
     ctx.replies = [{ error: timedOut }];
     const { status, body } = await askQ('Which countries were blocked most?');
     expect(status).toBe(502);

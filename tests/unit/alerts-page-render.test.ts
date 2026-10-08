@@ -1,8 +1,9 @@
 /**
- * Server-side render of the Alerts page: firing alerts and the last 7 days,
- * dismissed alerts and muted rules, the rules table, channels without
- * credentials, labelled AI text, the digest, read-only roles, and the page's
- * pure helpers (episodes, links, destinations).
+ * Server-side render of the Alerts page: open alerts, the history (last 7
+ * days and the event log), dismissed alerts and muted rules, the rules table
+ * with built-in rules, channels without credentials with the digest, the
+ * banner when alerts go nowhere, read-only roles, and the page's pure helpers
+ * (episodes, links, destinations).
  */
 import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
@@ -18,6 +19,7 @@ vi.mock('@/ee/alerting/ui/actions', () => ({
   deleteAlertChannelAction: vi.fn(),
   setAlertChannelEnabledAction: vi.fn(),
   testAlertChannelAction: vi.fn(),
+  testAlertChannelDraftAction: vi.fn(),
   saveAlertRuleAction: vi.fn(),
   deleteAlertRuleAction: vi.fn(),
   setAlertRuleEnabledAction: vi.fn(),
@@ -53,14 +55,14 @@ const channels: AlertChannelView[] = [
   { id: 2, name: 'Ops Slack', type: 'slack', enabled: true, config: { hasWebhookUrl: true, webhookUrlHint: 'https://hooks.slack.com' }, lastDeliveryAt: stamp, lastDeliveryError: 'The endpoint answered with HTTP 404', createdAt: stamp, updatedAt: stamp },
 ];
 const rules: AlertRuleView[] = [
-  { id: 1, name: 'Certificates', type: 'cert_expiring', enabled: true, params: { days: 14, includeClientCertificates: true }, channelIds: [1], cooldownMinutes: 1440, notifyOnResolve: true, explain: false, scope: { type: 'all' }, scopeLabel: 'All certificates, client certificates too', forMinutes: 0, firing: [], pending: [], lastFiredAt: null, mute: null, createdAt: stamp, updatedAt: stamp },
-  { id: 2, name: 'Upstreams', type: 'upstream_down', enabled: true, params: { minFails: 1 }, channelIds: [2], cooldownMinutes: 60, notifyOnResolve: true, explain: true, scope: { type: 'hosts', proxyHostIds: [4] }, scopeLabel: 'Upstreams of 1 proxy host', forMinutes: 5, firing: [{ subjectKey: 'upstream:10.0.0.5:8080', title: 'Upstream 10.0.0.5:8080 failing', firedAt: stamp }], pending: [], lastFiredAt: stamp, mute: null, createdAt: stamp, updatedAt: stamp },
+  { id: 1, builtIn: 'certificates', name: 'Certificates', type: 'cert_expiring', enabled: true, params: { days: 14, includeClientCertificates: true }, channelIds: [1], cooldownMinutes: 1440, notifyOnResolve: true, explain: false, scope: { type: 'all' }, scopeLabel: 'All certificates, client certificates too', forMinutes: 0, firing: [], pending: [], lastFiredAt: null, mute: null, createdAt: stamp, updatedAt: stamp },
+  { id: 2, builtIn: null, name: 'Upstreams', type: 'upstream_down', enabled: true, params: { minFails: 1 }, channelIds: [2], cooldownMinutes: 60, notifyOnResolve: true, explain: true, scope: { type: 'hosts', proxyHostIds: [4] }, scopeLabel: 'Upstreams of 1 proxy host', forMinutes: 5, firing: [{ subjectKey: 'upstream:10.0.0.5:8080', title: 'Upstream 10.0.0.5:8080 failing', firedAt: stamp }], pending: [], lastFiredAt: stamp, mute: null, createdAt: stamp, updatedAt: stamp },
 ];
 const events: AlertEventView[] = [
   { id: 1, ruleId: 2, ruleName: 'Upstreams', ruleType: 'upstream_down', subjectKey: 'upstream:10.0.0.5:8080', status: 'firing', severity: 'critical', title: 'Upstream 10.0.0.5:8080 is failing', message: 'Check it.', explanation: 'The backend stopped answering.', notified: true, deliveries: [{ channelId: 2, channelName: 'Ops Slack', ok: false, error: 'The endpoint answered with HTTP 404' }], createdAt: stamp, resolvedAt: null, silenced: null },
 ];
 const firing: FiringAlertView[] = [
-  { ruleId: 2, ruleName: 'Upstreams', ruleType: 'upstream_down', subjectKey: 'upstream:10.0.0.5:8080', severity: 'critical', title: 'Upstream 10.0.0.5:8080 is failing', message: 'Check it.', firedAt: stamp, deliveries: events[0].deliveries, silenced: null, eventId: 1, notifyOnResolve: true, dismissal: null, mute: null },
+  { ruleId: 2, ruleName: 'Upstreams', ruleType: 'upstream_down', subjectKey: 'upstream:10.0.0.5:8080', severity: 'critical', title: 'Upstream 10.0.0.5:8080 is failing', message: 'Check it.', firedAt: stamp, deliveries: events[0].deliveries, silenced: null, eventId: 1, notifyOnResolve: true, dismissal: null, mute: null, links: [] },
 ];
 
 const dismissal: AlertSilenceView = {
@@ -99,7 +101,7 @@ function render(tab: AlertsTab, extra: Extra = {}) {
       firing: extra.firing ?? firing,
       recent: events,
       history: extra.history ?? { events, total: 1, page: 1, perPage: 25 },
-      ai: { enabled: true, provider: 'anthropic', model: 'claude-opus-5', baseUrl: null, hasApiKey: true, timeoutSeconds: 60, configured: true, defaultModel: 'claude-opus-5' },
+      aiConfigured: true,
       digest,
       canWrite: extra.canWrite,
       proxyHosts: [{ id: 4, name: 'app.example.com' }],
@@ -109,17 +111,28 @@ function render(tab: AlertsTab, extra: Extra = {}) {
 }
 
 describe('Alerts page', () => {
-  it('shows the tabs with counts and the New rule button', () => {
+  it('shows the tabs with counts, and New rule on the Rules tab only', () => {
     const html = render('firing');
     expect(html).not.toContain('href="/license"');
-    expect(html).toMatch(/role="tab"[^>]*>Firing <span[^>]*bg-warn-tint[^>]*>1<\/span>/);
-    expect(html).toContain('New rule');
-    expect(html).toMatch(/role="tab"[^>]*>AI</);
+    expect(html).toMatch(/role="tab"[^>]*>Open <span[^>]*bg-warn-tint[^>]*>1<\/span>/);
+    expect(html).toMatch(/role="tab"[^>]*>History</);
+    expect(html).not.toMatch(/role="tab"[^>]*>AI</);
+    expect(html).not.toContain('New rule');
+    expect(render('rules')).toContain('New rule');
   });
 
-  it('lists what is firing now and the last 7 days', () => {
+  it('says when alerts are not sent anywhere', () => {
+    const silent = rules.map((rule) => ({ ...rule, channelIds: [] }));
+    const html = render('firing', { rules: silent });
+    expect(html).toContain('Alerts are not sent anywhere');
+    expect(html).toContain('Open channels');
+    expect(render('firing', { rules: silent, channels: [] })).toContain('Add a channel');
+    expect(render('firing')).not.toContain('Alerts are not sent anywhere');
+  });
+
+  it('lists what is open now', () => {
     const html = render('firing');
-    expect(html).toContain('Firing now');
+    expect(html).toContain('Open now');
     expect(html).toContain('Upstream 10.0.0.5:8080 is failing');
     expect(html).toContain('Critical');
     expect(html).toContain('Ops Slack: failed');
@@ -127,11 +140,14 @@ describe('Alerts page', () => {
     expect(html).toContain('Edit rule');
     expect(html).toContain('href="/proxy-hosts?search=10.0.0.5%3A8080"');
     expect(html).toContain('A resolve notice goes to the same channel');
+    expect(html).not.toContain('Last 7 days');
+  });
+
+  it('shows the last 7 days and the event log on the History tab', () => {
+    const html = render('history');
     expect(html).toContain('Last 7 days');
     expect(html).toContain('aria-expanded="false"');
-    expect(html).toContain('href="/alerts?tab=history"');
-    // Collapsed: the AI text is only in the expanded row.
-    expect(html).not.toContain('The backend stopped answering.');
+    expect(html).toContain('Event log, last 90 days');
   });
 
   it('offers Dismiss to writers', () => {
@@ -152,8 +168,8 @@ describe('Alerts page', () => {
     // Already dismissed: no second Dismiss.
     expect(html).not.toContain('aria-label="Dismiss Upstream');
     // Nothing left that needs attention: the tab count is not tinted.
-    expect(html).not.toMatch(/role="tab"[^>]*>Firing <span[^>]*bg-warn-tint/);
-    expect(html).toMatch(/role="tab"[^>]*>Firing <span[^>]*>1<\/span>/);
+    expect(html).not.toMatch(/role="tab"[^>]*>Open <span[^>]*bg-warn-tint/);
+    expect(html).toMatch(/role="tab"[^>]*>Open <span[^>]*>0<\/span>/);
 
     const reader = render('firing', { firing: quiet, canWrite: false });
     expect(reader.replace(/<[^>]+>/g, '')).toContain('Dismissed · Alex Morgan');
@@ -170,16 +186,18 @@ describe('Alerts page', () => {
     expect(history).toContain('Not sent (dismissed)');
   });
 
-  it('says when nothing is firing', () => {
-    expect(render('firing', { firing: [] })).toContain('Nothing is firing');
+  it('says when nothing is open, and that what rules find is also under Needs attention', () => {
+    const html = render('firing', { firing: [] });
+    expect(html).toContain('Nothing is open');
+    expect(html).toContain('2 rules watch this install');
+    expect(html).toContain('under Needs attention on the overview');
   });
 
-  it('says that nothing can fire without rules, and that Needs attention does not alert', () => {
-    const html = render('firing', { firing: [], rules: [], canWrite: true });
-    expect(html).toContain('No alert rules, so nothing can fire');
-    expect(html).toContain('Needs attention on the overview is worked out from traffic and does not alert');
+  it('says that nothing is watched when every rule is disabled', () => {
+    const html = render('firing', { firing: [], rules: rules.map((rule) => ({ ...rule, enabled: false })), canWrite: true });
+    expect(html).toContain('Every rule is disabled, so nothing is watched');
     expect(html).toContain('>New rule</button>');
-    expect(html).not.toContain('Nothing is firing');
+    expect(html).not.toContain('Nothing is open');
   });
 
   it('shows rules with scope, duration, severity, channels and when they fired', () => {
@@ -192,11 +210,15 @@ describe('Alerts page', () => {
     expect(html).toContain('5 min');
     expect(html).toContain('critical under 3 days');
     expect(html).toContain('AI explanation');
-    expect(html).toContain('Firing (1) since');
+    expect(html).toContain('Open (1) since');
     expect(html).toContain('Never');
     expect(html).toContain('aria-label="Edit rule Upstreams"');
     expect(html).not.toMatch(/disabled=""[^>]*aria-label="Edit rule Upstreams"/);
-    expect(html.match(/title="Delete"/g)?.length).toBe(2);
+    // The built-in rule is marked and cannot be deleted; the other can.
+    expect(html).toContain('>Built-in<');
+    expect(html.match(/title="Delete"/g)?.length).toBe(1);
+    expect(html).toContain('aria-label="Delete rule Upstreams"');
+    expect(html).not.toContain('aria-label="Delete rule Certificates"');
   });
 
   it('offers Mute on rules and shows a muted rule with Unmute', () => {
@@ -226,6 +248,8 @@ describe('Alerts page', () => {
     expect(html).toContain('1 rule');
     expect(html.match(/title="Delete"/g)?.length).toBe(2);
     expect(html.match(/Send test</g)?.length).toBe(2);
+    // One Add channel, in the card's header.
+    expect(html.match(/Add channel</g)?.length).toBe(1);
     // The failing Slack channel's banner offers its editor.
     expect(html).toContain('Edit Ops Slack');
     expect(html).not.toContain('hasPassword');
@@ -233,11 +257,9 @@ describe('Alerts page', () => {
 
   it('labels AI explanations in the history', () => {
     const html = render('history');
-    expect(html).toContain('Alert history');
     expect(html).toContain('AI-generated explanation');
     expect(html).toContain('The backend stopped answering.');
     expect(html).toContain('Ops Slack: failed');
-    expect(html).toContain('Firing alerts');
     // One page: no pager.
     expect(html).not.toContain('aria-label="Pages of alert history"');
   });
@@ -274,15 +296,14 @@ describe('Alerts page', () => {
     expect(channelsHtml).not.toContain('Send test');
   });
 
-  it('offers to remove the AI provider', () => {
-    const html = render('ai');
-    expect(html).toContain('Remove provider');
-    expect(html).not.toMatch(/license/i);
-    expect(html).not.toContain('sk-');
+  it('explains channels when there are none, with one Add channel', () => {
+    const html = render('channels', { channels: [] });
+    expect(html).toContain('A channel is where alerts are sent');
+    expect(html.match(/Add channel</g)?.length).toBe(1);
   });
 
-  it('lets an admin configure, preview and send the digest', () => {
-    const html = render('ai');
+  it('lets an admin configure, preview and send the digest, on the Channels tab', () => {
+    const html = render('channels');
     expect(html).toContain('Daily security digest');
     expect(html).toContain('value="Europe/Rome"');
     expect(html).toContain('Ops Slack delivered');

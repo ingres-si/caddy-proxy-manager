@@ -204,64 +204,18 @@ export const GOVERNANCE_OPENAPI_PATHS = {
       tags: ["Overview"],
       summary: "List what needs attention",
       description:
-        "Items from every source the caller may read: certificates expiring, failing renewal or missing (certificates:read), the last Caddy " +
-        "apply (settings:read), the setup checklist (settings:read), 5xx bursts, mitigation spikes and blocked-traffic concentrations of the " +
-        "last 24 hours (analytics:read), failing LDAP directories (ldap:read) and accounts locked out by the MFA policy (users:read), " +
-        "alerts firing (alerts:read), change requests (approvals:read), access " +
+        "Items from every source the caller may read: alerts open now, except dismissed ones and those of muted rules (alerts:read; every " +
+        "install has built-in rules for certificates, the Caddy apply, server errors, upstreams, backups and the fleet), certificates " +
+        "expiring, failing renewal or missing (certificates:read), the last Caddy apply (settings:read) and failing backups (backups:read) " +
+        "for callers who do not see them as alerts (a source is left out for readers of the alerts while an enabled rule of its kind watches " +
+        "every host), the setup checklist (settings:read), failing LDAP directories (ldap:read) and accounts locked out by the MFA policy " +
+        "(users:read), change requests (approvals:read), access " +
         "reviews overdue or due (access_reviews:read) and the caller's own items to review (anyone), fleet nodes that failed to sync, drifted, " +
-        "stopped checking in or run another release (fleet:read or instances:read), failing backups (backups:read). Each source has a few " +
-        "seconds; one that fails or is slow is reported in sources and the others still answer. Any signed-in user.",
+        "stopped checking in or run another release (fleet:read or instances:read). An alert names its rule and subject (issue), to dismiss " +
+        "it with POST /api/v1/alert-silences. Each source has a few seconds; one that fails or is slow is reported in sources and the others " +
+        "still answer. Any signed-in user.",
       operationId: "getOverviewAttention",
       responses: { "200": { description: "Items", content: json(ref("AttentionView")) }, ...errors("401") },
-    },
-  },
-  "/api/v1/overview/attention/dismissals": {
-    get: {
-      tags: ["Overview"],
-      summary: "List the caller's dismissed items",
-      description: "The items the caller hid from their own list, still in effect, the ones ending soonest first. Any signed-in user.",
-      operationId: "listAttentionDismissals",
-      responses: {
-        "200": {
-          description: "Dismissals",
-          content: json({ type: "object", properties: { dismissals: { type: "array", items: ref("AttentionDismissal") } } }),
-        },
-        ...errors("401"),
-      },
-    },
-    post: {
-      tags: ["Overview"],
-      summary: "Dismiss an item",
-      description:
-        "Hides an item from the caller's own list for 24 hours, or until it becomes more severe than it is now. Only items listed for the " +
-        "caller now, of sources that allow it (traffic: 5xx bursts, mitigation spikes, blocked-traffic concentrations; dismissible on the " +
-        "item); other sources answer 400, an item not listed 404. Dismissing it again starts the 24 hours again. Other users still see it. " +
-        "Any signed-in user.",
-      operationId: "dismissAttentionItem",
-      requestBody: {
-        required: true,
-        content: json({
-          type: "object",
-          additionalProperties: false,
-          required: ["source", "id"],
-          properties: { source: { type: "string", example: "traffic" }, id: { type: "string", example: "spike:www.example.com" } },
-        }),
-      },
-      responses: { "200": { description: "Dismissal", content: json(ref("AttentionDismissal")) }, ...errors("400", "401", "404") },
-    },
-    delete: {
-      tags: ["Overview"],
-      summary: "List dismissed items again",
-      description: "With source and id, that item; with neither, every item the caller dismissed. Any signed-in user.",
-      operationId: "restoreAttentionItems",
-      parameters: [
-        { name: "source", in: "query", required: false, schema: { type: "string" } },
-        { name: "id", in: "query", required: false, schema: { type: "string" } },
-      ],
-      responses: {
-        "200": { description: "How many dismissals ended", content: json({ type: "object", properties: { restored: { type: "integer" } } }) },
-        ...errors("400", "401"),
-      },
     },
   },
 };
@@ -469,27 +423,24 @@ export const GOVERNANCE_OPENAPI_SCHEMAS = {
             detail: { type: "string" },
             actions: { type: "array", items: { type: "object", properties: { label: { type: "string" }, route: { type: "string" } } } },
             at: { type: ["string", "null"] },
-            dismissible: { type: "boolean", description: "The caller may hide it (POST /api/v1/overview/attention/dismissals)" },
+            issue: {
+              type: "object",
+              description: "An alert open now: its rule and subject, to dismiss it until it resolves (POST /api/v1/alert-silences, alerts:write). Absent for other items.",
+              properties: { ruleId: { type: "integer" }, subjectKey: { type: "string" } },
+            },
           },
         },
       },
       truncated: { type: "boolean" },
       counts: { type: "object", properties: { critical: { type: "integer" }, warning: { type: "integer" }, info: { type: "integer" } } },
-      dismissed: { type: "integer", description: "Items the caller dismissed that would otherwise be listed (not in items or counts)" },
       sources: {
         type: "array",
         items: { type: "object", properties: { id: { type: "string" }, label: { type: "string" }, status: { type: "string", enum: ["ok", "error", "timeout"] }, items: { type: "integer" } } },
       },
-    },
-  },
-  AttentionDismissal: {
-    type: "object",
-    properties: {
-      source: { type: "string", example: "traffic" },
-      id: { type: "string" },
-      severity: { type: "string", enum: ["critical", "warning", "info"], description: "The item's severity when it was dismissed" },
-      until: { type: "string", format: "date-time" },
-      createdAt: { type: "string", format: "date-time" },
+      notifying: {
+        type: ["boolean", "null"],
+        description: "Whether alerts are sent anywhere (an enabled rule notifies an enabled channel); null for callers who may not read alerts.",
+      },
     },
   },
 };

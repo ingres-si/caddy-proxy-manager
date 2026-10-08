@@ -23,7 +23,6 @@ const EXPECTED: Record<string, string[]> = {
   '/api/v1/config-history/{id}/rollback-preview': ['get'],
   '/api/v1/setup-checklist': ['get', 'put'],
   '/api/v1/overview/attention': ['get'],
-  '/api/v1/overview/attention/dismissals': ['get', 'post', 'delete'],
   '/api/v1/compliance/controls/status': ['get'],
   '/api/v1/compliance/schedules': ['get', 'post'],
   '/api/v1/compliance/schedules/{id}': ['get', 'put', 'delete'],

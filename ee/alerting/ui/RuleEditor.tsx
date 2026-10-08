@@ -306,8 +306,11 @@ export default function RuleEditor({ open, rule, onClose, channels, proxyHosts, 
         )}
 
         {scoped && (
-          <fieldset className="flex flex-col gap-2.5 rounded-xl border border-line p-3.5">
-            <legend className="px-1 text-sm font-medium">Scope</legend>
+          // A group, not a fieldset: Safari draws a flex fieldset's top border broken around its legend.
+          <div role="group" aria-labelledby="rule-scope-title" className="flex flex-col gap-2.5 rounded-xl border border-line p-3.5">
+            <span id="rule-scope-title" className="text-sm font-medium">
+              Scope
+            </span>
             <SegmentedControl
               size="sm"
               label="Hosts the rule watches"
@@ -356,7 +359,7 @@ export default function RuleEditor({ open, rule, onClose, channels, proxyHosts, 
                 One alert per proxy host, instead of one for all of them
               </SwitchRow>
             )}
-          </fieldset>
+          </div>
         )}
 
         {forDuration && (
@@ -373,7 +376,9 @@ export default function RuleEditor({ open, rule, onClose, channels, proxyHosts, 
         <div className="flex flex-col gap-1.5">
           <Label>Notify</Label>
           {channels.length === 0 ? (
-            <p className="text-[13px] text-muted-foreground">No channels yet: alerts are only recorded in the history.</p>
+            <p className="text-[13px] text-muted-foreground">
+              No channels yet: its alerts are listed on the Open tab and under Needs attention only. Add a channel on the Channels tab.
+            </p>
           ) : (
             <div className="flex flex-col gap-1.5">
               {channels.map((channel) => (
@@ -382,6 +387,9 @@ export default function RuleEditor({ open, rule, onClose, channels, proxyHosts, 
                   {channel.name} <span className="text-xs text-muted-foreground">{CHANNEL_TYPE_LABELS[channel.type]}</span>
                 </label>
               ))}
+              {form.channelIds.length === 0 && (
+                <p className="text-xs text-muted-foreground">None chosen: its alerts are listed in Ingressi only.</p>
+              )}
             </div>
           )}
         </div>
@@ -399,7 +407,7 @@ export default function RuleEditor({ open, rule, onClose, channels, proxyHosts, 
           <SwitchRow id="rule-explain" checked={form.explain} onChange={(checked) => set("explain", checked)}>
             Add an AI-generated explanation
           </SwitchRow>
-          {!aiConfigured && <p className="pl-[42px] text-xs text-muted-foreground">Set up a provider on the AI tab first.</p>}
+          {!aiConfigured && <p className="pl-[42px] text-xs text-muted-foreground">Set up a provider in AI settings first.</p>}
         </div>
 
         <SwitchRow id="rule-enabled" checked={form.enabled} onChange={(checked) => set("enabled", checked)}>

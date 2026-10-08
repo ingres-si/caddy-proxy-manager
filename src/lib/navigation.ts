@@ -195,7 +195,14 @@ export const NAV_GROUPS: readonly NavGroup[] = [
 
 /** Under the groups, above the user menu. */
 export const NAV_FOOTER: readonly NavEntry[] = [
-  { key: "settings", label: "Settings", pages: [{ href: "/settings", label: "Settings", permission: "settings:read" }] },
+  {
+    key: "settings",
+    label: "Settings",
+    pages: [
+      { href: "/settings", label: "Settings", permission: "settings:read" },
+      { href: "/settings/ai", label: "AI settings", permission: "ai:read" },
+    ],
+  },
   { key: "branding", label: "Branding", pages: [{ href: "/branding", label: "Branding", permission: "branding:read" }] },
 ];
 

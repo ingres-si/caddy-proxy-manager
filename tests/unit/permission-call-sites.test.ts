@@ -73,8 +73,7 @@ describe('permission call sites', () => {
     // a reviewer of a campaign is the authorization,
     // ee/access-reviews/decisions.ts), and the overview's "needs attention"
     // list, whose providers each check the caller's permissions
-    // (src/lib/attention/registry.ts), and the caller's own dismissals of
-    // its items (only items the caller is shown, src/lib/attention/dismissals.ts).
+    // (src/lib/attention/registry.ts).
     const unguarded = new Set([
       'app/api/branding/[asset]/route.ts',
       'app/api/v1/access-review-assignments/[id]/route.ts',
@@ -82,7 +81,6 @@ describe('permission call sites', () => {
       'app/api/v1/access-review-assignments/evidence/route.ts',
       'app/api/v1/access-review-assignments/route.ts',
       'app/api/v1/overview/attention/route.ts',
-      'app/api/v1/overview/attention/dismissals/route.ts',
       'app/api/monetization/gate/route.ts',
       'app/api/monetization/me/card/route.ts',
       'app/api/monetization/me/checkout/route.ts',

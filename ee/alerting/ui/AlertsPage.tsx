@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: Elastic-2.0
+import { redirect } from "next/navigation";
 import { requirePermission } from "@/src/lib/auth";
 import { can, scopeTagsFor } from "@/src/lib/permissions";
 import { listProxyHosts } from "@/src/lib/models/proxy-hosts";
 import { listAlertChannels } from "@/ee/alerting/channels";
 import { listAlertRules } from "@/ee/alerting/rules";
 import { listAlertEvents, listFiringAlerts } from "@/ee/alerting/events";
+import { ensureBuiltInAlertRulesOnce } from "@/ee/alerting/builtins";
 import { getAiSettingsView } from "@/ee/ai/settings";
 import { getDigestSettingsView } from "@/ee/ai/digest-settings";
-import { getQuestionSettings } from "@/ee/ai/questions/settings";
 import { DEFAULT_PAGE_SIZE, parsePageParam } from "@/src/lib/pagination";
 import AlertsClient, { type AlertsTab } from "./AlertsClient";
 
@@ -16,7 +17,7 @@ export const metadata = { title: "Alerts" };
 const HISTORY_PER_PAGE = DEFAULT_PAGE_SIZE;
 /** The newest events read for the "Last 7 days" table. */
 const RECENT_EVENTS = 200;
-const TABS: readonly AlertsTab[] = ["firing", "rules", "channels", "ai", "history"];
+const TABS: readonly AlertsTab[] = ["firing", "history", "rules", "channels"];
 
 interface PageProps {
   searchParams: Promise<{ tab?: string; page?: string | string[] }>;
@@ -31,15 +32,18 @@ async function historyPage(page: number) {
 
 export default async function AlertsPage({ searchParams }: PageProps) {
   const { access } = await requirePermission("alerts:read");
-  // The AI tab (provider settings and the digest) is the ai area.
+  const { tab: tabParam, page: pageParam } = await searchParams;
+  // The AI tab moved to AI settings (/settings/ai).
+  if (tabParam === "ai") redirect("/settings/ai");
   const canAi = can(access, "ai:read");
   const canWrite = can(access, "alerts:write");
-  const { tab: tabParam, page: pageParam } = await searchParams;
-  const tab = TABS.find((candidate) => candidate === tabParam && (candidate !== "ai" || canAi)) ?? "firing";
+  const tab = TABS.find((candidate) => candidate === tabParam) ?? "firing";
   const page = parsePageParam(pageParam);
   const now = Date.now();
+  // A fresh install shows its built-in rules before the evaluator's first run.
+  await ensureBuiltInAlertRulesOnce().catch(() => undefined);
   // Every view below is already free of credentials; proxy hosts are reduced to ids and names.
-  const [channels, rules, firing, recent, history, hosts, ai, digest, questions] = await Promise.all([
+  const [channels, rules, firing, recent, history, hosts, ai, digest] = await Promise.all([
     listAlertChannels(),
     listAlertRules(),
     listFiringAlerts(),
@@ -50,8 +54,7 @@ export default async function AlertsPage({ searchParams }: PageProps) {
       ? listProxyHosts(scopeTagsFor(access, "proxy_hosts"))
       : Promise.resolve([]),
     getAiSettingsView(),
-    getDigestSettingsView(),
-    getQuestionSettings(),
+    canAi ? getDigestSettingsView() : Promise.resolve(null),
   ]);
   const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
   return (
@@ -62,10 +65,8 @@ export default async function AlertsPage({ searchParams }: PageProps) {
       firing={firing}
       recent={recent.events.filter((event) => event.createdAt >= weekAgo)}
       history={history}
-      ai={ai}
       digest={digest}
-      questions={questions}
-      canAi={canAi}
+      aiConfigured={ai.configured}
       canWrite={canWrite}
       proxyHosts={hosts.map((host) => ({ id: host.id, name: host.name || host.domains[0] || `Host #${host.id}` })).sort((a, b) => a.name.localeCompare(b.name))}
       now={now}

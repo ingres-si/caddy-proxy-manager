@@ -17,7 +17,7 @@ import { configSnapshots } from "./db/schema";
 import { can, scopeTagsFor, type Access } from "./permissions";
 import { APP_VERSION, formatVersion } from "./app-version";
 import { collectAttention, type AttentionView } from "./attention";
-import { cachedTrafficSignals } from "./attention/traffic-provider";
+import { cachedTrafficSignals } from "./analytics/signals-cache";
 import { parseAnalyticsQuery, queryAnalytics } from "./analytics/query";
 import { queryHostSummaries, type HostSummary } from "./analytics/hosts";
 import { resolveRange } from "./analytics/range";
@@ -94,6 +94,7 @@ export function overviewPermissions(access: Access): OverviewPermissions {
     readAnalytics: can(access, "analytics:read"),
     readSecurity: can(access, "waf:read"),
     readAlerts: can(access, "alerts:read"),
+    writeAlerts: can(access, "alerts:write"),
     readAuditLog: can(access, "audit_log:read"),
     readUsers: can(access, "users:read"),
     readSso: can(access, "sso:read"),
@@ -367,7 +368,7 @@ export async function loadFirstRun(access: Access): Promise<OverviewFirstRun | n
 // ── The page ─────────────────────────────────────────────────────────────
 
 function emptyAttention(now: Date): AttentionView {
-  return { generatedAt: now.toISOString(), items: [], truncated: false, counts: { critical: 0, warning: 0, info: 0 }, dismissed: 0, sources: [] };
+  return { generatedAt: now.toISOString(), items: [], truncated: false, counts: { critical: 0, warning: 0, info: 0 }, sources: [], notifying: null };
 }
 
 export async function loadOverview(

@@ -2,6 +2,14 @@
 
 Pull the new images and recreate the containers with `docker compose pull && docker compose up -d`. (`docker compose restart` does not re-read `.env`.)
 
+## Upgrading to v2.3.0
+
+- **Built-in alert rules.** Every install gets rules for expiring certificates, a failed Caddy apply, server errors, failing upstreams, failed backups and the fleet (WAF block spike is added disabled). They notify nobody until you choose channels in them; what they find is listed on **Alerts** and under **Needs attention**. A rule type you already had a rule for gets no built-in one. See [built-in rules](../ee/docs/alerting.md#built-in-rules).
+- **Needs attention lists alerts.** Server errors there are alerts of the built-in Error rate rule now, which resolve when the error rate is back to normal; mitigation spikes and blocked-traffic concentrations are no longer listed (sign-in redirects no longer count as blocked traffic in them anywhere). Certificate, Caddy and backup items appear as alerts for readers of the alerts while the matching rule is enabled.
+- **Dismissing from Needs attention dismisses the alert for everyone** until it resolves (`POST /api/v1/alert-silences`). The per-account dismissals of v2.2.0 and `/api/v1/overview/attention/dismissals` are removed; the migration drops the `attention_dismissals` table.
+- **The Alerts page** has the tabs Open, History, Rules and Channels. The AI provider and analytics questions moved to **AI settings** (`/settings/ai`), the daily digest to the Channels tab; `/alerts?tab=ai` redirects.
+- One database migration runs on start.
+
 ## Upgrading to v2.2.0
 
 Nothing to change. Two database migrations run on start: a table for dismissed Needs attention items and three columns on `user_preferences` for the default list ordering. The Caddy image moves to Caddy 2.11.7.

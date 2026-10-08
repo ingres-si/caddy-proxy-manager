@@ -59,7 +59,7 @@ export type AskPanelProps = {
   availability: QuestionAvailability;
   /** Built-in administrator: may delete others' shared questions. */
   isAdmin: boolean;
-  /** May open Alerts → AI to set up a provider (ai:read). */
+  /** May open AI settings to set up a provider (ai:read). */
   canOpenAiSettings: boolean;
   /** "card": a section of the Analytics page; "plain": inside a dialog. */
   variant?: "card" | "plain";
@@ -72,7 +72,7 @@ function Unavailable({ availability, canOpenAiSettings }: Pick<AskPanelProps, "a
     return <Banner tone="info" title="Traffic analytics is off." />;
   }
   if (!availability.enabled) {
-    return <Banner tone="info" title="Questions are turned off.">An administrator turned them off in the AI settings (Alerts → AI).</Banner>;
+    return <Banner tone="info" title="Questions are turned off.">An administrator turned them off in the AI settings (AI settings).</Banner>;
   }
   if (!availability.providerConfigured) {
     return (
@@ -82,7 +82,7 @@ function Unavailable({ availability, canOpenAiSettings }: Pick<AskPanelProps, "a
         actions={
           canOpenAiSettings ? (
             <Button asChild variant="outline" size="sm">
-              <Link href="/alerts?tab=ai">Set up a provider</Link>
+              <Link href="/settings/ai">Set up a provider</Link>
             </Button>
           ) : undefined
         }
@@ -321,7 +321,7 @@ export function AskPanel({ availability, isAdmin, canOpenAiSettings, variant = "
         onShare={(item, shared) => void change(() => send("PATCH", `${SAVED_URL}/${item.id}`, { shared }), shared ? "Question shared" : "Question no longer shared")}
         onDelete={(item) => void change(() => send("DELETE", `${SAVED_URL}/${item.id}`), "Question deleted")}
       />
-      <p className="m-0 text-xs text-soft">Your question is sent to the AI provider set up on Alerts → AI.</p>
+      <p className="m-0 text-xs text-soft">Your question is sent to the AI provider set up on AI settings.</p>
     </div>
   );
 

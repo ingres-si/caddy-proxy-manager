@@ -202,6 +202,8 @@ export type AlertChannelView = {
 
 export type AlertRuleView = {
   id: number;
+  /** Key of a built-in rule (ee/alerting/builtins.ts); null for rules people created. Built-in rules cannot be deleted. */
+  builtIn: string | null;
   name: string;
   type: RuleType;
   enabled: boolean;
@@ -267,6 +269,8 @@ export type FiringAlertView = {
   dismissal: AlertSilenceView | null;
   /** Its rule's mute in effect, if any. */
   mute: AlertSilenceView | null;
+  /** The pages that deal with it (links.ts), each with the permission needed to open it. */
+  links: { label: string; route: string; permission: string }[];
 };
 
 export function isChannelType(value: unknown): value is ChannelType {

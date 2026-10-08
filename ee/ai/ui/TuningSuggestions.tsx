@@ -119,7 +119,7 @@ export default function TuningSuggestions({ initialSuggestions, canWrite = true,
         <label className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           <Checkbox checked={explain && aiConfigured} onCheckedChange={(checked) => setExplain(checked === true)} disabled={!canWrite || !aiConfigured} />
           Add AI risk assessments (up to 5)
-          {!aiConfigured && <span className="text-xs text-muted-foreground">Needs an AI provider (Alerts → AI).</span>}
+          {!aiConfigured && <span className="text-xs text-muted-foreground">Needs an AI provider (AI settings).</span>}
         </label>
       </div>
       {error && (

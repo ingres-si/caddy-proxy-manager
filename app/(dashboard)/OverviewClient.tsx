@@ -107,7 +107,7 @@ function Overview({ data }: { data: OverviewData }) {
         )}
       </header>
 
-      <AttentionSection attention={data.attention} alertsHref={permissions.readAlerts ? "/alerts?tab=rules" : null} />
+      <AttentionSection attention={data.attention} alertsHref={permissions.readAlerts ? "/alerts" : null} canDismiss={permissions.writeAlerts} />
 
       <div className={cn("flex flex-col gap-3 transition-opacity md:gap-5", pending && "opacity-60")} aria-busy={pending || undefined}>
         {traffic && answered(traffic) && <KpiRow traffic={traffic} range={data.range} />}
@@ -174,7 +174,7 @@ function FirstRun({ data }: { data: OverviewData & { firstRun: NonNullable<Overv
         <h1 className="m-0 text-2xl leading-8 font-semibold tracking-[-0.015em]">Welcome, {data.userName}</h1>
       </header>
 
-      <AttentionSection attention={data.attention} alertsHref={permissions.readAlerts ? "/alerts?tab=rules" : null} exclude={["setup"]} hideWhenEmpty />
+      <AttentionSection attention={data.attention} alertsHref={permissions.readAlerts ? "/alerts" : null} canDismiss={permissions.writeAlerts} exclude={["setup"]} hideWhenEmpty />
 
       <div className="flex flex-wrap items-start gap-3 md:gap-5">
         <SetupChecklist firstRun={firstRun} permissions={permissions} />

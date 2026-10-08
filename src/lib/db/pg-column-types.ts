@@ -174,7 +174,6 @@ export const PG_INTEGER_COLUMNS: Readonly<Record<string, Readonly<Record<string,
   // A WebAuthn signature counter is an unsigned 32-bit number.
   passkeys: { id: "int4", userId: "int4", counter: "int8" },
   user_preferences: { userId: "int4" },
-  attention_dismissals: { id: "int4", userId: "int4" },
   ldap_directory_health: { directoryId: "int4", consecutiveFailures: "int4" },
   compliance_report_schedules: { id: "int4", dayOfMonth: "int4", createdBy: "int4" },
   compliance_restore_tests: { id: "int4", backupDestinationId: "int4", recordedBy: "int4" },

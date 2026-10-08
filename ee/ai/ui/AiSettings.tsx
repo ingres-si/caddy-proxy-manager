@@ -14,11 +14,9 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AiProvider, AiSettingsView } from "@/ee/ai/settings";
-import { MAX_AI_TIMEOUT_SECONDS, MIN_AI_TIMEOUT_SECONDS, type DigestSettingsView } from "@/ee/ai/types";
-import type { AlertChannelView } from "@/ee/alerting/types";
+import { MAX_AI_TIMEOUT_SECONDS, MIN_AI_TIMEOUT_SECONDS } from "@/ee/ai/types";
 import type { QuestionSettingsView } from "@/ee/ai/questions/types";
 import { removeAiSettingsAction, saveAiSettingsAction, testAiProviderAction } from "@/ee/alerting/ui/actions";
-import DigestSection from "./DigestSection";
 import QuestionSettingsSection from "@/ee/ai/questions/ui/QuestionSettingsSection";
 
 const PROVIDER_LABELS: Record<AiProvider, string> = {
@@ -28,12 +26,16 @@ const PROVIDER_LABELS: Record<AiProvider, string> = {
 
 type Props = {
   settings: AiSettingsView;
-  digest?: DigestSettingsView;
-  channels?: AlertChannelView[];
   questions?: QuestionSettingsView;
+  /** ai:write: the forms can be saved; without it they are read-only. */
+  canWrite?: boolean;
 };
 
-export default function AiTab({ settings, digest, channels = [], questions }: Props) {
+/**
+ * AI settings: the AI provider (alert explanations, the digest summary and
+ * analytics questions use it) and the settings of analytics questions.
+ */
+export default function AiSettings({ settings, questions, canWrite = true }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [enabled, setEnabled] = useState(settings.provider ? settings.enabled : true);
@@ -95,14 +97,18 @@ export default function AiTab({ settings, digest, channels = [], questions }: Pr
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
+    <div className="grid items-start gap-5 lg:grid-cols-2">
       <SectionCard
         title="AI provider"
         actions={settings.configured ? <Badge variant="success">Active</Badge> : <Badge variant="secondary">Not set up</Badge>}
         padded
         contentClassName="flex flex-col gap-4"
       >
-          <fieldset disabled={pending} className="flex flex-col gap-4">
+          <p className="m-0 text-[13px] text-muted-foreground">
+            The model gets aggregated facts about an alert, the daily digest or a question, never logs or raw requests. Client addresses,
+            user agents and paths are only sent for analytics questions, when allowed under Analytics questions.
+          </p>
+          <fieldset disabled={pending || !canWrite} className="flex flex-col gap-4">
             <div className="space-y-1.5">
               <Label>Provider</Label>
               <Select
@@ -187,13 +193,13 @@ export default function AiTab({ settings, digest, channels = [], questions }: Pr
             </Banner>
           )}
           <div className="flex flex-wrap gap-2">
-            <Button onClick={save} disabled={pending}>
+            <Button onClick={save} disabled={pending || !canWrite}>
               Save
             </Button>
-            <Button variant="outline" onClick={test} disabled={pending || !settings.configured}>
+            <Button variant="outline" onClick={test} disabled={pending || !canWrite || !settings.configured}>
               Explain a sample alert
             </Button>
-            {settings.provider && (
+            {settings.provider && canWrite && (
               <Button variant="danger" onClick={remove} disabled={pending}>
                 Remove provider
               </Button>
@@ -212,15 +218,7 @@ export default function AiTab({ settings, digest, channels = [], questions }: Pr
             ))}
       </SectionCard>
 
-      <SectionCard title="What the model sees" padded contentClassName="text-[13px] text-muted-foreground">
-        <p className="m-0">
-          Aggregated facts about the alert, the digest or the question, never logs or raw requests.
-          {questions && " Client addresses, user agents and paths stay hidden unless you allow them below."}
-        </p>
-      </SectionCard>
-
-      {digest && <DigestSection settings={digest} channels={channels} aiConfigured={settings.configured} />}
-      {questions && <QuestionSettingsSection settings={questions} aiConfigured={settings.configured} />}
+      {questions && <QuestionSettingsSection settings={questions} aiConfigured={settings.configured} canWrite={canWrite} />}
     </div>
   );
 }

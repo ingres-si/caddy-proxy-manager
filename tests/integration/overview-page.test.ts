@@ -46,7 +46,7 @@ vi.mock('../../src/lib/analytics/signals', async (importOriginal) => {
 import { builtInAccess, type Access, type Permission } from '../../src/lib/permissions';
 import { hostTone, loadOverview, parseOverviewRange, replicaNode, BUSIEST_HOSTS } from '../../src/lib/overview';
 import { updateSetupChecklist } from '../../src/lib/setup-checklist';
-import { clearTrafficSignalsCache } from '../../src/lib/attention/traffic-provider';
+import { clearTrafficSignalsCache } from '../../src/lib/analytics/signals-cache';
 import { recordCaddyApplyResult, resetCaddyApplyStatusForTests } from '../../src/lib/caddy-apply-status';
 import type { FleetInstanceView } from '../../ee/fleet/types';
 import { first as dbFirst } from '@/src/lib/db/ops';

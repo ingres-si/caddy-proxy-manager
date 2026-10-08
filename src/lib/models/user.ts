@@ -32,7 +32,6 @@ import {
   fleetRollouts,
   passkeys,
   userPreferences,
-  attentionDismissals,
 } from "../db/schema";
 import { referencesTo } from "../db/references";
 import { and, count, eq, inArray, isNotNull, ne, notInArray, sql } from "drizzle-orm";
@@ -778,7 +777,6 @@ async function deleteUserReferences(tx: AppTx, userId: number): Promise<void> {
   await tx.delete(twoFactors).where(eq(twoFactors.userId, userId));
   await tx.delete(passkeys).where(eq(passkeys.userId, userId));
   await tx.delete(userPreferences).where(eq(userPreferences.userId, userId));
-  await tx.delete(attentionDismissals).where(eq(attentionDismissals.userId, userId));
   await tx.delete(pendingOAuthLinks).where(eq(pendingOAuthLinks.userId, userId));
   await tx.delete(apiTokens).where(eq(apiTokens.createdBy, userId));
   await tx.delete(verifications).where(sql`${linkStateUserId} = ${String(userId)}`);

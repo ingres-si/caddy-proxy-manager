@@ -7,7 +7,7 @@ import { ApiClientError } from "@/src/lib/api-errors";
 import { createAlertChannel, deleteAlertChannel, updateAlertChannel } from "@/ee/alerting/channels";
 import { createAlertRule, deleteAlertRule, updateAlertRule } from "@/ee/alerting/rules";
 import { createAlertSilence, deleteAlertSilence } from "@/ee/alerting/silences";
-import { testAlertChannel } from "@/ee/alerting/test-channel";
+import { testAlertChannel, testAlertChannelDraft } from "@/ee/alerting/test-channel";
 import { clearAiSettings, saveAiSettings } from "@/ee/ai/settings";
 import { testAiProvider } from "@/ee/ai/explain";
 import { saveQuestionSettings } from "@/ee/ai/questions/settings";
@@ -48,6 +48,18 @@ export async function setAlertChannelEnabledAction(id: number, enabled: boolean)
 
 export async function deleteAlertChannelAction(id: number): Promise<AlertActionResult> {
   return run(await requirePermission("alerts:write"), (userId) => deleteAlertChannel(id, userId));
+}
+
+/** Sends a test notification to the channel being added or edited, without saving it. */
+export async function testAlertChannelDraftAction(id: number | null, input: unknown): Promise<AlertActionResult> {
+  const session = await requirePermission("alerts:write");
+  try {
+    const result = await testAlertChannelDraft(id, input, Number(session.user.id));
+    return result.ok ? { ok: true, message: "Test notification sent" } : { ok: false, error: result.error };
+  } catch (error) {
+    if (error instanceof ApiClientError) return { ok: false, error: error.message };
+    throw error;
+  }
 }
 
 export async function testAlertChannelAction(id: number): Promise<AlertActionResult> {

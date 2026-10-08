@@ -92,7 +92,7 @@ The `admins` scope of the MFA policy covers administrators **and every user with
 
 - **Users and groups → Roles** lists the built-in roles and the custom roles with how many permissions each holds, its tag scope and its users. Open a role to see its permissions grouped by area (Traffic, Observe, Identity, Govern, Platform), who holds it, and **Edit role**, **Duplicate** and **Delete role**. The editor has the permission matrix (one row per area) and the tag scope; permissions you do not hold are disabled. Deleting asks for confirmation and says how many users fall back to viewer.
 - The role picker (create user, edit user) offers the built-in roles and the custom roles. Admin and administrator-level roles are disabled for non-administrators.
-- The sidebar shows the pages whose read permission the user holds (`NAV_GROUPS` in `src/lib/navigation.ts`). Pages and server actions check the same permissions as the REST API. Sections inside a page that belong to another area are hidden: the settings pages of instance sync, OAuth providers and high availability, and certificate storage on Certificate settings, show a notice without `instances:read`, `sso:read` or `high_availability:read` (the traffic totals on Analytics settings need `analytics:read`), the AI tab on Alerts (`ai:read`), the backups line and export/import on History (`backups:read`, `config:export`, `config:import`), the MFA policy on Users (`mfa_policy:read`), the user picker on Groups (`users:read`).
+- The sidebar shows the pages whose read permission the user holds (`NAV_GROUPS` in `src/lib/navigation.ts`). Pages and server actions check the same permissions as the REST API. Sections inside a page that belong to another area are hidden: the settings pages of instance sync, OAuth providers and high availability, and certificate storage on Certificate settings, show a notice without `instances:read`, `sso:read` or `high_availability:read` (the traffic totals on Analytics settings need `analytics:read`), the daily digest on the Channels tab of Alerts (`ai:read`), the backups line and export/import on History (`backups:read`, `config:export`, `config:import`), the MFA policy on Users (`mfa_policy:read`), the user picker on Groups (`users:read`).
 - Proxy host and L4 host forms have a **Tags** field; the lists show the tags.
 
 ## Instance sync
@@ -252,6 +252,7 @@ Every guard of a route, page or server action and the permission it checks. Rout
 | `app/(dashboard)/settings/actions.ts` | `deleteOAuthProviderAction` | `sso:write` |
 | `app/(dashboard)/settings/actions.ts` | `suppressWafRuleForHostAction` | `waf:write` |
 | `app/(dashboard)/settings/actions.ts` | `updateWafSettingsActionUnlocked` | `waf:write` |
+| `app/(dashboard)/settings/ai/page.tsx` | `AiSettingsPage` | `ai:read` |
 | `app/(dashboard)/settings/page.tsx` | `SettingsPage` | `settings:read` |
 | `app/(dashboard)/sign-in/page.tsx` | `SignInPage` | `sso:read` |
 | `app/(dashboard)/sso/page.tsx` | `SsoPage` | `sso:read` |
@@ -321,6 +322,7 @@ Every guard of a route, page or server action and the permission it checks. Rout
 | `app/api/v1/alert-channels/[id]/test/route.ts` | `POST` | `alerts:write` |
 | `app/api/v1/alert-channels/route.ts` | `GET` | `alerts:read` |
 | `app/api/v1/alert-channels/route.ts` | `POST` | `alerts:write` |
+| `app/api/v1/alert-channels/test/route.ts` | `POST` | `alerts:write` |
 | `app/api/v1/alert-events/firing/route.ts` | `GET` | `alerts:read` |
 | `app/api/v1/alert-events/route.ts` | `GET` | `alerts:read` |
 | `app/api/v1/alert-rules/[id]/route.ts` | `GET` | `alerts:read` |
@@ -656,6 +658,7 @@ Every guard of a route, page or server action and the permission it checks. Rout
 | `ee/alerting/ui/actions.ts` | `setAlertChannelEnabledAction` | `alerts:write` |
 | `ee/alerting/ui/actions.ts` | `deleteAlertChannelAction` | `alerts:write` |
 | `ee/alerting/ui/actions.ts` | `testAlertChannelAction` | `alerts:write` |
+| `ee/alerting/ui/actions.ts` | `testAlertChannelDraftAction` | `alerts:write` |
 | `ee/alerting/ui/actions.ts` | `saveAlertRuleAction` | `alerts:write` |
 | `ee/alerting/ui/actions.ts` | `setAlertRuleEnabledAction` | `alerts:write` |
 | `ee/alerting/ui/actions.ts` | `deleteAlertRuleAction` | `alerts:write` |

@@ -14,7 +14,7 @@ import { can } from "@/src/lib/permissions";
 import { getIdentityHealth } from "@/src/lib/identity-health";
 import type { AttentionItem, AttentionProvider } from "./types";
 
-type Item = Omit<AttentionItem, "source" | "dismissible">;
+type Item = Omit<AttentionItem, "source">;
 
 function utc(iso: string): string {
   return `${iso.slice(0, 16).replace("T", " ")} UTC`;

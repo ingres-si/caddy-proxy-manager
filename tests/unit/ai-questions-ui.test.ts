@@ -74,7 +74,7 @@ describe('Ask box', () => {
 
   it('explains why it is read-only', () => {
     expect(panel({ providerConfigured: false, provider: null })).toContain('No AI provider is set up.');
-    expect(panel({ providerConfigured: false })).toContain('href="/alerts?tab=ai"');
+    expect(panel({ providerConfigured: false })).toContain('href="/settings/ai"');
     expect(panel({ enabled: false })).toContain('Questions are turned off.');
     expect(panel({ analyticsEnabled: false })).toContain('Traffic analytics is off.');
     expect(panel({ enabled: false })).toMatch(/aria-label="Your question"[^>]*disabled=""|disabled=""[^>]*aria-label="Your question"/);

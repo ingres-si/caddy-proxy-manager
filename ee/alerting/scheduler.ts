@@ -4,6 +4,7 @@
  * (never in tests).
  */
 import { runAlertEvaluation } from "./engine";
+import { ensureBuiltInAlertRulesOnce } from "./builtins";
 import { onShutdown } from "@/src/lib/shutdown";
 
 export const ALERT_EVALUATION_INTERVAL_MS = 60_000;
@@ -20,6 +21,9 @@ export async function runScheduledAlertEvaluation(): Promise<void> {
   if (state.running) return;
   state.running = true;
   try {
+    await ensureBuiltInAlertRulesOnce().catch((error) => {
+      console.warn("[alerting] Built-in alert rules could not be added:", error instanceof Error ? error.name : typeof error);
+    });
     const summary = await runAlertEvaluation();
     if (summary.fired > 0 || summary.resolved > 0) {
       console.log(

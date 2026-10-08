@@ -226,7 +226,7 @@ Never log lines, client addresses or request contents. **Collect again** refresh
 
 A new draft fills every stage from a structured template (English or Italian): the facts in plain sentences and bracketed placeholders for what only you can know. **Fill from template** does it again for one stage.
 
-**Draft with AI** asks the AI provider configured for the AI analyst (Alerts → AI, your own model: Anthropic or an OpenAI-compatible server on your network) for a first draft of one stage. The rules of the AI analyst apply:
+**Draft with AI** asks the AI provider configured for the AI analyst (AI settings, your own model: Anthropic or an OpenAI-compatible server on your network) for a first draft of one stage. The rules of the AI analyst apply:
 
 - the model receives the stage's legal requirements and the aggregated facts only, without who made each change;
 - the facts are untrusted (titles, host names, paths, rule messages, alert titles and change summaries can come from users, logs or requests): they travel as JSON inside a data block delimited by a tag with a random id, with `<` and `>` escaped, and the system prompt tells the model never to follow instructions inside it;

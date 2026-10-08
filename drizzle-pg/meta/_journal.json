@@ -85,6 +85,13 @@
       "when": 1791441041010,
       "tag": "0063_default_sort_options",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1791448555727,
+      "tag": "0064_alert_rules_built_in",
+      "breakpoints": true
     }
   ]
 }

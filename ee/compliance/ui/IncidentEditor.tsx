@@ -329,7 +329,7 @@ export default function IncidentEditor({
                       size="sm"
                       onClick={() => draft(definition.key, "ai")}
                       disabled={pending || !aiConfigured}
-                      title={aiConfigured ? "Your configured model writes a first draft from the aggregated facts" : "Configure an AI provider under Alerts → AI first"}
+                      title={aiConfigured ? "Your configured model writes a first draft from the aggregated facts" : "Configure an AI provider under AI settings first"}
                     >
                       <Sparkles className="h-4 w-4" /> Draft with AI
                     </Button>

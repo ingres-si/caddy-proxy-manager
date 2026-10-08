@@ -1,8 +1,8 @@
 /**
- * The traffic and sign-in sources of the overview's "Needs attention"
- * (src/lib/attention/traffic-provider.ts and identity-provider.ts): what
- * each signal becomes, the links each reader gets, the permissions each
- * source answers for, and the signal cache.
+ * The sign-in source of the overview's "Needs attention"
+ * (src/lib/attention/identity-provider.ts): what each issue becomes and the
+ * permissions it answers for; and that traffic signals, which only feed the
+ * overview's cards now (src/lib/analytics/signals-cache.ts), are no source.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestDb, type TestDb } from '../helpers/db';
@@ -29,14 +29,8 @@ import { builtInAccess, type Access, type Permission } from '../../src/lib/permi
 import { collectAttention } from '../../src/lib/attention';
 import type { AttentionItem } from '../../src/lib/attention/types';
 import { getTrafficSignals } from '../../src/lib/analytics/signals';
-import { cachedTrafficSignals, clearTrafficSignalsCache, countryName, utcClock } from '../../src/lib/attention/traffic-provider';
-import { analyticsHref, securityHref } from '../../src/lib/analytics/links';
+import { cachedTrafficSignals, clearTrafficSignalsCache } from '../../src/lib/analytics/signals-cache';
 import { first } from '@/src/lib/db/ops';
-
-/** The filters of a link, decoded. */
-function linkFilters(route: string): unknown {
-  return JSON.parse(new URL(route, 'http://localhost').searchParams.get('filters') ?? 'null');
-}
 
 const NOW = Math.floor(Date.parse('2026-10-03T11:36:00.000Z') / 1000);
 const stamp = () => new Date().toISOString();
@@ -81,8 +75,6 @@ async function items(access: Access, source: string): Promise<AttentionItem[]> {
   return view.items.filter((item) => item.source === source);
 }
 
-const byId = (list: AttentionItem[], prefix: string) => list.filter((item) => item.id.startsWith(prefix));
-
 beforeEach(async () => {
   ctx.db = createTestDb();
   vi.clearAllMocks();
@@ -98,107 +90,18 @@ beforeEach(async () => {
 });
 
 describe('traffic signals', () => {
-  it('turns 5xx bursts into items: critical while going on, a warning once over', async () => {
-    const list = await items(builtInAccess(adminId, 'admin'), 'traffic');
-    const [ongoing, over] = [byId(list, 'burst:api.example.com')[0], byId(list, 'burst:mail.example.com')[0]];
-    expect(ongoing).toMatchObject({
-      severity: 'critical',
-      title: `api.example.com is answering with server errors: 40 since ${utcClock(NOW - 240, NOW)}`,
-      actions: [{ label: 'Show requests', route: analyticsHref([{ dim: 'host', value: 'api.example.com' }, { dim: 'status', value: '5xx' }]) }],
-    });
-    expect(ongoing.detail).toContain('Mostly 502 to GET /, 40% of its requests since then.');
-    expect(over).toMatchObject({
-      severity: 'warning',
-      title: 'mail.example.com answered 143 requests with server errors at 09:06 UTC',
-      at: new Date((NOW - 9000) * 1000).toISOString(),
-      actions: [
-        { label: 'Open host', route: `/proxy-hosts/${mailHostId}` },
-        { label: 'Show requests', route: analyticsHref([{ dim: 'host', value: 'mail.example.com' }, { dim: 'status', value: '5xx' }]) },
-      ],
-    });
-    expect(over.detail).toBe('Mostly 501 to POST /Microsoft-Server-ActiveSync, until 09:07 UTC (12% of its requests in those minutes); normal again since.');
+  it('are not a source of Needs attention: server errors are alerts of the built-in Error rate rule', async () => {
+    const view = await collectAttention(builtInAccess(adminId, 'admin'), { now: new Date(NOW * 1000) });
+    expect(view.sources.map((source) => source.id)).not.toContain('traffic');
+    expect(getTrafficSignals).not.toHaveBeenCalled();
   });
 
-  it('turns mitigation spikes into items, a warning at ten times the usual', async () => {
-    const list = await items(builtInAccess(adminId, 'admin'), 'traffic');
-    expect(byId(list, 'spike:mail.example.com')[0]).toMatchObject({
-      severity: 'warning',
-      title: '600 mitigated requests to mail.example.com, 30 times its daily average',
-      detail: 'Mostly WAF blocks in the last 24 hours, against a daily average of 20 over the 7 days before.',
-      actions: [
-        { label: 'Open host', route: `/proxy-hosts/${mailHostId}` },
-        { label: 'Security events', route: securityHref({ kind: 'waf', filters: [{ dim: 'host', value: 'mail.example.com' }] }) },
-      ],
-    });
-    expect(byId(list, 'spike:shop.example.com')[0]).toMatchObject({
-      severity: 'info',
-      title: '120 mitigated requests to shop.example.com, none in the week before',
-      actions: [
-        { label: 'Show requests', route: analyticsHref([{ dim: 'host', value: 'shop.example.com' }, { dim: 'outcome', op: 'is_not', value: 'served' }]) },
-        { label: 'Security events', route: securityHref({ kind: 'geo', filters: [{ dim: 'host', value: 'shop.example.com' }] }) },
-      ],
-    });
-    ctx.signals = signals({ mitigationSpikes: [{ host: 'shop.example.com', proxyHostId: null, count: 500, baseline: 0, factor: null, topOutcome: 'geo' }] });
-    clearTrafficSignalsCache();
-    expect(byId(await items(builtInAccess(adminId, 'admin'), 'traffic'), 'spike:')[0].severity).toBe('warning');
-  });
-
-  it('turns blocked-traffic concentrations into items with their countries and rule', async () => {
-    const list = await items(builtInAccess(adminId, 'admin'), 'traffic');
-    const geo = byId(list, 'blocked:example.com:geo')[0];
-    expect(geo).toMatchObject({
-      severity: 'info',
-      title: 'Geo rules blocked 826 requests to example.com/portal',
-      actions: [
-        { label: 'Show requests', route: analyticsHref([{ dim: 'host', value: 'example.com' }, { dim: 'path', value: '/portal' }, { dim: 'outcome', value: 'geo' }]) },
-        { label: 'Security events', route: securityHref({ kind: 'geo', filters: [{ dim: 'host', value: 'example.com' }, { dim: 'path', value: '/portal' }] }) },
-      ],
-    });
-    expect(geo.detail).toMatch(/^From .+India, Australia and .+, 90% of what was mitigated on this host in the last 24 hours\.$/);
-    expect(linkFilters(geo.actions[0].route)).toEqual([
-      { dim: 'host', op: 'is', value: 'example.com' },
-      { dim: 'path', op: 'is', value: '/portal' },
-      { dim: 'outcome', op: 'is', value: 'geo' },
-    ]);
-    expect(geo.actions[1].route).toMatch(/^\/security\?range=24h&kind=geo&filters=.+#events$/);
-    const waf = byId(list, 'blocked:example.com:waf')[0];
-    expect(waf.title).toBe('The WAF blocked 100 requests to example.com/api');
-    expect(waf.detail).toBe('From the local network, 10% of what was mitigated on this host in the last 24 hours. Mostly rule 920450.');
-  });
-
-  it('links to hosts and security events only for readers who may open them', async () => {
-    const analyst = await items(custom(['analytics:read']), 'traffic');
-    expect(analyst).toHaveLength(6);
-    for (const item of analyst) {
-      expect(item.actions.map((action) => action.route).every((route) => route.startsWith('/analytics?'))).toBe(true);
-    }
-    // A tag scope that leaves the host out: no link to it.
-    const scoped = await items(custom(['analytics:read', 'proxy_hosts:read', 'waf:read'], ['team-a']), 'traffic');
-    expect(scoped.flatMap((item) => item.actions).some((action) => action.route.startsWith('/proxy-hosts/'))).toBe(false);
-    expect(scoped.flatMap((item) => item.actions).some((action) => action.route.startsWith('/security?'))).toBe(true);
-  });
-
-  it('answers only readers of the analytics, and nothing while analytics are off', async () => {
-    expect((await collectAttention(builtInAccess(memberId, 'viewer'))).sources.map((source) => source.id)).not.toContain('traffic');
-    expect((await collectAttention(custom(['analytics:read']))).sources.map((source) => source.id)).toContain('traffic');
-    ctx.signals = signals({ status: 'disabled' });
-    clearTrafficSignalsCache();
-    expect(await items(builtInAccess(adminId, 'admin'), 'traffic')).toEqual([]);
-  });
-
-  it('reuses the signals for 30 seconds', async () => {
+  it('are reused for 30 seconds by the overview', async () => {
     await cachedTrafficSignals(1_000_000);
     await cachedTrafficSignals(1_010_000);
     expect(getTrafficSignals).toHaveBeenCalledTimes(1);
     await cachedTrafficSignals(1_031_000);
     expect(getTrafficSignals).toHaveBeenCalledTimes(2);
-  });
-
-  it('names countries, the local network and unknown ones', () => {
-    expect(countryName('DE')).toBe('Germany');
-    expect(countryName('LAN')).toBe('the local network');
-    expect(countryName('XX')).toBeNull();
-    expect(utcClock(NOW - 86_400, NOW)).toBe('2 Oct 11:36 UTC');
   });
 });
 

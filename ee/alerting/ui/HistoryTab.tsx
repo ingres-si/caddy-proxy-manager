@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Elastic-2.0
 "use client";
 
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -18,7 +15,7 @@ type Props = { history: { events: AlertEventView[]; total: number; page: number;
 
 function Status({ event }: { event: AlertEventView }) {
   if (event.status === "resolved") return <StatusDot tone="ok" label="Resolved" />;
-  return <StatusDot tone={event.severity === "critical" ? "bad" : "warn"} label="Firing" />;
+  return <StatusDot tone={event.severity === "critical" ? "bad" : "warn"} label="Opened" />;
 }
 
 function Delivery({ event }: { event: AlertEventView }) {
@@ -42,15 +39,8 @@ export default function HistoryTab({ history }: Props) {
   const format = useFormat();
   return (
     <div className="flex flex-col gap-3">
-      <div>
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/alerts">
-            <ArrowLeft /> Firing alerts
-          </Link>
-        </Button>
-      </div>
       <SectionCard
-        title="Alert history"
+        title="Event log, last 90 days"
         count={history.total}
         footer={
           history.total > history.perPage ? (
