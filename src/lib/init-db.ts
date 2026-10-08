@@ -128,11 +128,12 @@ async function clearAdminMfaForRecovery(adminId: number): Promise<void> {
 }
 
 /**
- * Ensures the admin user from environment variables exists in the database.
- * This is called during application startup.
- * The password from environment variables is hashed and stored securely.
- * Before that, it clears rows left under the ids of deleted users, so neither
- * the primary admin nor any later user inherits them.
+ * Creates the primary admin from the environment variables on a fresh
+ * install, and applies changed environment credentials to it (account
+ * recovery). A primary admin that was deleted is not created again on a
+ * restart, only when the environment credentials change. Called during
+ * application startup. Before that, it clears rows left under the ids of
+ * deleted users, so neither the primary admin nor any later user inherits them.
  */
 
 //Todo: this could probably be handled better, especially for the adminid.
@@ -238,6 +239,33 @@ export async function ensureAdminUser(): Promise<void> {
       }
       console.log(`Admin user present: ${config.adminUsername}`);
     }
+    return;
+  }
+
+  // No primary admin. On a fresh install (no accounts, no marker) it is
+  // created. Otherwise it was deleted on purpose, and stays deleted until the
+  // environment credentials change: the documented recovery path creates it
+  // again, an unchanged environment on a restart does not.
+  const marker = await getAdminEnvMarker();
+  if (marker) {
+    const envChanged = marker.username !== config.adminUsername ||
+      !(await passwordMatches(config.adminPassword, marker.passwordHash));
+    if (!envChanged) {
+      console.log(
+        "The primary admin was deleted and is not created again. To create it again, change ADMIN_PASSWORD " +
+        "(or ADMIN_USERNAME) and recreate the web container (docker compose up -d)."
+      );
+      return;
+    }
+  } else if (await first(appDb.select({ id: users.id }).from(users).limit(1))) {
+    // Accounts but no marker: the primary admin was deleted before releases
+    // recorded the environment. Record it now, so that changing it creates
+    // the admin again.
+    await storeAdminEnvMarker(await bcrypt.hash(config.adminPassword, BCRYPT_COST));
+    console.log(
+      "There is no primary admin (it was deleted), so none is created. To create it, change ADMIN_PASSWORD " +
+      "(or ADMIN_USERNAME) and recreate the web container (docker compose up -d)."
+    );
     return;
   }
 

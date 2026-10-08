@@ -279,9 +279,14 @@ describe('ensureAdminUser', { timeout: 20_000 }, () => {
     });
 
     it('does not create the primary admin with it', async () => {
-      await seedOtherUser('ops@example.com', 'admin');
+      await ensureAdminUser();
+      await ctx.db.delete(schema.accounts).where(eq(schema.accounts.userId, 1));
+      await ctx.db.delete(schema.users).where(eq(schema.users.id, 1));
+      await seedOtherUser('ops@example.com', 'root');
 
-      await expect(ensureAdminUser()).rejects.toThrow(/ADMIN_USERNAME "admin" is not applied/);
+      // A changed environment would create the deleted admin again, but not with a name another account has.
+      ctx.config.adminUsername = 'root';
+      await expect(ensureAdminUser()).rejects.toThrow(/ADMIN_USERNAME "root" is not applied/);
       expect(await first(ctx.db.select().from(schema.users).where(eq(schema.users.id, 1)).limit(1))).toBeUndefined();
     });
 
@@ -294,6 +299,78 @@ describe('ensureAdminUser', { timeout: 20_000 }, () => {
       await ensureAdminUser();
 
       expect(bcrypt.compareSync('Recovery-Password-2026!', await adminHash())).toBe(true);
+    });
+  });
+
+  describe('a deleted primary admin', () => {
+    async function deleteAdmin() {
+      await ctx.db.delete(schema.accounts).where(eq(schema.accounts.userId, 1));
+      await ctx.db.delete(schema.users).where(eq(schema.users.id, 1));
+    }
+
+    async function seedUser() {
+      const now = new Date().toISOString();
+      await ctx.db.insert(schema.users).values({
+        email: 'ops@example.com', username: 'ops', displayUsername: 'ops', name: null, role: 'admin', provider: 'credentials',
+        subject: 'ops@example.com', status: 'active', createdAt: now, updatedAt: now,
+      });
+    }
+
+    const admin = async () => await first(ctx.db.select().from(schema.users).where(eq(schema.users.id, 1)).limit(1));
+
+    it('is not created again on a restart', async () => {
+      await ensureAdminUser();
+      await seedUser();
+      await deleteAdmin();
+
+      await ensureAdminUser();
+      await ensureAdminUser();
+      expect(await admin()).toBeUndefined();
+      expect(await ctx.db.select().from(schema.accounts).where(eq(schema.accounts.userId, 1))).toEqual([]);
+    });
+
+    it('is created again when the environment credentials change (account recovery)', async () => {
+      await ensureAdminUser();
+      await deleteAdmin();
+      await ensureAdminUser();
+      expect(await admin()).toBeUndefined();
+
+      ctx.config.adminPassword = 'Recovery-Password-2026!';
+      await ensureAdminUser();
+      expect(await admin()).toMatchObject({ username: 'admin', role: 'admin', status: 'active' });
+      expect(bcrypt.compareSync('Recovery-Password-2026!', await accountHash())).toBe(true);
+    });
+
+    it('is created again under a changed ADMIN_USERNAME', async () => {
+      await ensureAdminUser();
+      await deleteAdmin();
+
+      ctx.config.adminUsername = 'Root';
+      await ensureAdminUser();
+      expect(await admin()).toMatchObject({ username: 'root', displayUsername: 'Root' });
+    });
+
+    it('deleted before the marker existed is not created either, until the environment changes', async () => {
+      await ensureAdminUser();
+      await seedUser();
+      await deleteAdmin();
+      await forgetMarker();
+
+      await ensureAdminUser();
+      expect(await admin()).toBeUndefined();
+      // The environment is recorded now, so a change to it is recovery.
+      expect(await storedMarker()).toMatchObject({ v: 2, username: 'admin' });
+      await ensureAdminUser();
+      expect(await admin()).toBeUndefined();
+
+      ctx.config.adminPassword = 'Recovery-Password-2026!';
+      await ensureAdminUser();
+      expect(await admin()).toMatchObject({ username: 'admin', role: 'admin' });
+    });
+
+    it('is still created on a fresh install', async () => {
+      await ensureAdminUser();
+      expect(await admin()).toMatchObject({ username: 'admin', role: 'admin', status: 'active' });
     });
   });
 

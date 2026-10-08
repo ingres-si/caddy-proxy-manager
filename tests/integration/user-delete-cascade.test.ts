@@ -22,6 +22,8 @@ import { referencesTo as schemaReferencesTo } from '../../src/lib/db/references'
 
 const ctx = vi.hoisted(() => ({
   db: null as unknown as TestDb,
+  /** The environment credentials ensureAdminUser reads. */
+  admin: { adminUsername: 'admin', adminPassword: 'Env-Password-2026!' },
 }));
 
 vi.mock('../../src/lib/db', async () => (await import('../helpers/db-module')).mockDbModule(() => ctx.db));
@@ -29,7 +31,7 @@ vi.mock('../../src/lib/config', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../src/lib/config')>();
   return {
     ...original,
-    config: { ...original.config, adminUsername: 'admin', adminPassword: 'Env-Password-2026!' },
+    config: new Proxy(original.config, { get: (target, key) => (key in ctx.admin ? ctx.admin[key as keyof typeof ctx.admin] : Reflect.get(target, key)) }),
   };
 });
 
@@ -40,6 +42,7 @@ import { execRaw, first } from '@/src/lib/db/ops';
 
 beforeEach(async () => {
   ctx.db = createTestDb();
+  ctx.admin.adminPassword = 'Env-Password-2026!';
   // better-sqlite3 turns foreign keys on; production (bun:sqlite) leaves them
   // off, and PostgreSQL databases have none.
   await disableForeignKeys(ctx.db);
@@ -372,6 +375,10 @@ describe('deleteUser with foreign keys off', () => {
     expect(await validateToken(rawToken)).not.toBeNull();
 
     await deleteUser(1);
+    // A deleted primary admin comes back only when the environment credentials change (account recovery).
+    await ensureAdminUser();
+    expect(await getUserById(1)).toBeNull();
+    ctx.admin.adminPassword = 'Recovery-Password-2026!';
     await ensureAdminUser();
 
     expect((await getUserById(1))?.role).toBe('admin');
@@ -391,6 +398,7 @@ describe('ensureAdminUser after a deletion that did not cascade', { timeout: 20_
     await ctx.db.delete(schema.users).where(eq(schema.users.id, 1));
     expect(await referencesTo(1)).toEqual({ ...SEEDED, accounts: 2 });
 
+    ctx.admin.adminPassword = 'Recovery-Password-2026!';
     await ensureAdminUser();
 
     expect((await getUserById(1))?.role).toBe('admin');
