@@ -110,7 +110,7 @@ export function AttentionSection({
   hideWhenEmpty = false,
 }: {
   attention: AttentionView;
-  /** "Alert rules" in the title row, for readers of the alerts. */
+  /** "Set up alerts" in the title row, for readers of the alerts: these items do not alert by themselves. */
   alertsHref?: string | null;
   /** Sources left out (the first-run page shows the checklist itself). */
   exclude?: readonly string[];
@@ -184,7 +184,7 @@ export function AttentionSection({
     <SectionCard
       title="Needs attention"
       count={items.length > 0 ? count : null}
-      link={alertsHref ? { label: "Alert rules", href: alertsHref } : undefined}
+      link={alertsHref ? { label: "Set up alerts", href: alertsHref } : undefined}
       className="max-md:[&>div:first-child]:px-3.5 max-md:[&>div:first-child]:py-2.5"
       footer={
         notes.length > 0 || dismissedCount > 0 ? (

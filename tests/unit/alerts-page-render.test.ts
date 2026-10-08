@@ -174,6 +174,14 @@ describe('Alerts page', () => {
     expect(render('firing', { firing: [] })).toContain('Nothing is firing');
   });
 
+  it('says that nothing can fire without rules, and that Needs attention does not alert', () => {
+    const html = render('firing', { firing: [], rules: [], canWrite: true });
+    expect(html).toContain('No alert rules, so nothing can fire');
+    expect(html).toContain('Needs attention on the overview is worked out from traffic and does not alert');
+    expect(html).toContain('>New rule</button>');
+    expect(html).not.toContain('Nothing is firing');
+  });
+
   it('shows rules with scope, duration, severity, channels and when they fired', () => {
     const html = render('rules');
     expect(html).toMatch(/<span class="num">2<\/span> of <span class="num">2<\/span> enabled/);

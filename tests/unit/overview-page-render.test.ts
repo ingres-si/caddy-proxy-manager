@@ -126,7 +126,7 @@ describe('the overview', () => {
     expect(html).toContain('<span class="sr-only">Critical: </span>mail.example.com is answering with server errors');
     expect(html).toContain('href="/analytics?range=24h&amp;host=mail.example.com&amp;status=5xx"');
     expect(html).toContain('aria-label="Certificate &quot;Shop&quot; expires in 4 days: View certificates"');
-    expect(html).toContain('href="/alerts"');
+    expect(html).toContain('href="/alerts?tab=rules">Set up alerts<');
     expect(html).toContain('Fleet did not answer in time');
     // Traffic items can be dismissed; certificate items cannot.
     expect(html).toContain('aria-label="Dismiss: mail.example.com is answering with server errors: 143 since 09:02 UTC"');
