@@ -1,7 +1,6 @@
 /**
  * The error a failed OpenAI-compatible call reports: a 403 from a provider
- * that this install proxies itself names the likely cause (its own WAF or
- * access rules) and the provider's own address to use instead.
+ * that this install proxies itself names the likely cause: its own WAF.
  */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -12,10 +11,10 @@ vi.mock('@/src/lib/models/proxy-hosts', () => ({
 import { providerHttpError } from '@/ee/ai/explain';
 
 describe('providerHttpError', () => {
-  it('points at this install’s WAF and the upstream when it proxies the provider', async () => {
+  it('points at this install’s WAF when it proxies the provider', async () => {
     expect(await providerHttpError('https://llm.example.com/v1', 403)).toBe(
-      'The provider answered with HTTP 403. llm.example.com is a proxy host of this install, so its WAF or access rules may have refused the prompt ' +
-        "(see Security events). Set the provider's own address in AI settings, such as http://192.168.6.17:4000/v1, so the request does not pass through them."
+      'The provider answered with HTTP 403. llm.example.com is the proxy host "LiteLLM" of this install, so its WAF may have refused the prompt ' +
+        '(see Security events). Prompts are free text: set that host\'s WAF to detection only, or exclude the rules that matched.'
     );
   });
 

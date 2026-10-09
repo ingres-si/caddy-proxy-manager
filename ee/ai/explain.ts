@@ -143,9 +143,8 @@ async function callAnthropic(provider: ResolvedAiProvider, prompt: ModelPrompt, 
 
 /**
  * "The provider answered with HTTP 403", and, when the provider's host is a
- * proxy host of this install, that its WAF or access rules may be what
- * refused: a prompt is long free text that the Core Rule Set easily takes for
- * an attack. The fix is the provider's own address, which skips them.
+ * proxy host of this install, that its WAF may be what refused: a prompt is
+ * long free text that the Core Rule Set easily takes for an attack.
  */
 export async function providerHttpError(baseUrl: string | null, status: number): Promise<string> {
   const message = `The provider answered with HTTP ${status}`;
@@ -155,11 +154,9 @@ export async function providerHttpError(baseUrl: string | null, status: number):
     const { listProxyHosts } = await import("@/src/lib/models/proxy-hosts");
     const host = findProxyHostForRequestHost(await listProxyHosts(), url.hostname);
     if (!host) return message;
-    const upstream = host.upstreams[0]?.replace(/\/+$/, "");
-    const direct = upstream && /^https?:\/\//.test(upstream) ? `, such as ${upstream}${url.pathname.replace(/\/+$/, "")},` : "";
     return (
-      `${message}. ${url.hostname} is a proxy host of this install, so its WAF or access rules may have refused the prompt ` +
-      `(see Security events). Set the provider's own address in AI settings${direct} so the request does not pass through them.`
+      `${message}. ${url.hostname} is the proxy host "${host.name}" of this install, so its WAF may have refused the prompt ` +
+      `(see Security events). Prompts are free text: set that host's WAF to detection only, or exclude the rules that matched.`
     );
   } catch {
     return message;
