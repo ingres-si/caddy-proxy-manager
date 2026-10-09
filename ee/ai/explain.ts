@@ -16,7 +16,6 @@ import { ApiValidationError } from "@/src/lib/api-errors";
 import { logAuditEvent } from "@/src/lib/audit";
 import { RULE_TYPE_DESCRIPTIONS, RULE_TYPE_LABELS, isRuleType, type Severity } from "@/ee/alerting/types";
 import { getAiProviderConfig, ANTHROPIC_API_URL, type ResolvedAiProvider } from "./settings";
-import { findProxyHostForRequestHost } from "@/src/lib/waf-suppression";
 
 export const AI_MAX_TOKENS = 1024;
 const MAX_EXPLANATION_CHARS = 1200;
@@ -142,25 +141,15 @@ async function callAnthropic(provider: ResolvedAiProvider, prompt: ModelPrompt, 
 }
 
 /**
- * "The provider answered with HTTP 403", and, when the provider's host is a
- * proxy host of this install, that its WAF may be what refused: a prompt is
- * long free text that the Core Rule Set easily takes for an attack.
+ * "The provider answered with HTTP 403", with the usual cause when the
+ * provider sits behind a web application firewall: a prompt is long free
+ * text that firewall rules easily take for an attack. Nothing about this
+ * install's configuration goes into it: readers of any role see the message.
  */
-export async function providerHttpError(baseUrl: string | null, status: number): Promise<string> {
+export function providerHttpError(status: number): string {
   const message = `The provider answered with HTTP ${status}`;
-  if (status !== 403 || !baseUrl) return message;
-  try {
-    const url = new URL(baseUrl);
-    const { listProxyHosts } = await import("@/src/lib/models/proxy-hosts");
-    const host = findProxyHostForRequestHost(await listProxyHosts(), url.hostname);
-    if (!host) return message;
-    return (
-      `${message}. ${url.hostname} is the proxy host "${host.name}" of this install, so its WAF may have refused the prompt ` +
-      `(see Security events). Prompts are free text: set that host's WAF to detection only, or exclude the rules that matched.`
-    );
-  } catch {
-    return message;
-  }
+  if (status !== 403) return message;
+  return `${message}. If a web application firewall protects the provider, it may have refused the prompt.`;
 }
 
 async function callOpenAiCompatible(provider: ResolvedAiProvider, prompt: ModelPrompt, signal: AbortSignal): Promise<string> {
@@ -183,7 +172,7 @@ async function callOpenAiCompatible(provider: ResolvedAiProvider, prompt: ModelP
     signal,
   });
   const body = await response.text();
-  if (!response.ok) throw new ProviderError(await providerHttpError(provider.baseUrl, response.status));
+  if (!response.ok) throw new ProviderError(providerHttpError(response.status));
   if (body.length > MAX_RESPONSE_BYTES) throw new ProviderError("The provider's answer was too large");
   let parsed: unknown;
   try {

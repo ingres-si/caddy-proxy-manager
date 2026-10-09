@@ -1,26 +1,17 @@
 /**
- * The error a failed OpenAI-compatible call reports: a 403 from a provider
- * that this install proxies itself names the likely cause: its own WAF.
+ * The error a failed OpenAI-compatible call reports: the status, and for a
+ * 403 the usual cause, without anything about this install's configuration.
  */
-import { describe, expect, it, vi } from 'vitest';
-
-vi.mock('@/src/lib/models/proxy-hosts', () => ({
-  listProxyHosts: async () => [{ id: 68, name: 'LiteLLM', domains: ['llm.example.com'], upstreams: ['http://192.168.6.17:4000'] }],
-}));
-
+import { describe, expect, it } from 'vitest';
 import { providerHttpError } from '@/ee/ai/explain';
 
 describe('providerHttpError', () => {
-  it('points at this install’s WAF when it proxies the provider', async () => {
-    expect(await providerHttpError('https://llm.example.com/v1', 403)).toBe(
-      'The provider answered with HTTP 403. llm.example.com is the proxy host "LiteLLM" of this install, so its WAF may have refused the prompt ' +
-        '(see Security events). Prompts are free text: set that host\'s WAF to detection only, or exclude the rules that matched.'
-    );
+  it('names a firewall as the usual cause of a 403', () => {
+    expect(providerHttpError(403)).toBe('The provider answered with HTTP 403. If a web application firewall protects the provider, it may have refused the prompt.');
   });
 
-  it('says only the status otherwise', async () => {
-    expect(await providerHttpError('https://api.example.net/v1', 403)).toBe('The provider answered with HTTP 403');
-    expect(await providerHttpError('https://llm.example.com/v1', 401)).toBe('The provider answered with HTTP 401');
-    expect(await providerHttpError(null, 403)).toBe('The provider answered with HTTP 403');
+  it('says only the status otherwise', () => {
+    expect(providerHttpError(401)).toBe('The provider answered with HTTP 401');
+    expect(providerHttpError(500)).toBe('The provider answered with HTTP 500');
   });
 });
