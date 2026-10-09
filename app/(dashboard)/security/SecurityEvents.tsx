@@ -66,7 +66,7 @@ export function SecurityEvents({
   const sourceValue = query.kind === null ? "all" : isSecuritySource(query.kind) ? query.kind : "mixed";
   const activeFilters: ActiveFilter[] = query.filters.map((filter) => ({
     dimension: filter.dim,
-    operator: filter.op === "is_not" ? "is not" : "is",
+    operator: filter.op === "is_not" ? "is not" : filter.op === "contains" ? "contains" : filter.op === "not_contains" ? "does not contain" : "is",
     value: filter.value,
   }));
   const dimensions: FilterDimension[] = [
@@ -128,7 +128,8 @@ export function SecurityEvents({
               toast.error(problem);
               return;
             }
-            onNavigate(toEvents(withFilter(query, { dim: filter.dimension, op: filter.operator === "is not" ? "is_not" : "is", value: filter.value })));
+            const op = filter.operator === "is not" ? "is_not" : filter.operator === "contains" ? "contains" : filter.operator === "does not contain" ? "not_contains" : "is";
+            onNavigate(toEvents(withFilter(query, { dim: filter.dimension, op, value: filter.value })));
           }}
           onRemove={(_filter, index) => onNavigate(toEvents(query.filters.filter((_, i) => i !== index)))}
           trailing={

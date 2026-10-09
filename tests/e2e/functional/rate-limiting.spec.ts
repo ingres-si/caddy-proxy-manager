@@ -183,7 +183,7 @@ test.describe('Rate limiting — dashboard', () => {
     await openEditorSection(page, 'Security');
     await expect(page.getByRole('heading', { name: 'Rate limiting', exact: true })).toBeVisible();
     const card = page.locator('#rate-limiting');
-    await card.getByRole('group', { name: 'Mode' }).getByRole('button', { name: 'Merge with global' }).click();
+    await card.getByRole('group', { name: 'Limits' }).getByRole('button', { name: "Global and this host's" }).click();
     await card.getByRole('button', { name: 'Add rule' }).click();
     await expect(card.getByTestId('rate-limit-rule')).toHaveCount(1);
 

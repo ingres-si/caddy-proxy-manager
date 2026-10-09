@@ -31,6 +31,8 @@ import { DIMENSIONS, METRIC_SQL, parseGrouping, parseMetric } from '@/src/lib/an
 import { parseAnalyticsQuery, queryAnalytics } from '@/src/lib/analytics/query';
 import { queryTopDimensions } from '@/src/lib/analytics/top';
 import { queryRequestLog } from '@/src/lib/analytics/requests';
+import { parseValueLimit, parseValueQuery, searchDimensionValues } from '@/src/lib/analytics/values';
+import { queryHostWafRules } from '@/src/lib/analytics/security';
 import { resolveRange } from '@/src/lib/analytics/range';
 import { ApiValidationError } from '@/src/lib/api-errors';
 
@@ -120,10 +122,32 @@ describe('buildFilterSql', () => {
       { dim: 'country', op: 'is_not', value: 'XX' },
     ]));
     expect(sql.startsWith(
-      '((host) = {f0:String} OR (host) = {f1:String}) AND ((intDiv(status, 100)) = {f2:UInt16} OR (status) = {f3:UInt16}) AND (multiIf('
+      '((host) = {f0:String} OR (host) = {f1:String}) AND ((intDiv(status, 100)) = {f2:UInt16} OR (status) = {f3:UInt16}) AND NOT ((multiIf('
     )).toBe(true);
-    expect(sql.endsWith(') != {f4:String}')).toBe(true);
+    expect(sql.endsWith(') = {f4:String})')).toBe(true);
     expect(params).toEqual({ f0: 'a.example.com', f1: 'b.example.com', f2: 5, f3: 404, f4: 'XX' });
+  });
+
+  it('matches part of the text of host, path, user agent and address, any case', () => {
+    const { sql, params } = buildFilterSql(parseFilters([
+      { dim: 'path', op: 'contains', value: 'suggest' },
+      { dim: 'path', op: 'is', value: '/' },
+      { dim: 'host', op: 'not_contains', value: 'staging' },
+    ]));
+    expect(sql).toBe(
+      "(positionCaseInsensitiveUTF8(splitByChar('?', uri)[1], {f0:String}) > 0 OR (splitByChar('?', uri)[1]) = {f1:String}) AND NOT (positionCaseInsensitiveUTF8(host, {f2:String}) > 0)"
+    );
+    expect(params).toEqual({ f0: 'suggest', f1: '/', f2: 'staging' });
+    // The text is bound, never written into the SQL.
+    expect(buildFilterSql(parseFilters([{ dim: 'path', op: 'contains', value: "x') OR 1=1 --" }])).sql).not.toContain('OR 1=1');
+  });
+
+  it('refuses "contains" on dimensions without text, and texts that are too long', () => {
+    expect(() => parseFilters([{ dim: 'status', op: 'contains', value: '50' }])).toThrow(/cannot be matched by part of its text/);
+    expect(() => parseFilters([{ dim: 'path', op: 'contains', value: 'x'.repeat(257) }])).toThrow(/at most 256/);
+    expect(() => parseFilters([{ dim: 'path', op: 'starts_with', value: '/a' }])).toThrow(/op must be/);
+    // A partial address is fine for "contains" (an exact address is required for "is").
+    expect(parseFilters([{ dim: 'ip', op: 'contains', value: '192.0.2.' }])).toEqual([{ dim: 'ip', op: 'contains', value: '192.0.2.' }]);
   });
 
   it('normalises values for their column type', () => {
@@ -213,5 +237,45 @@ describe('queries sent to ClickHouse', () => {
     expect(unavailable.totals).toHaveLength(48);
     const top = await queryTopDimensions({ range: resolveRange({}, NOW), filters: [], dimensions: ['host'], limit: 5 }, null);
     expect(top.status).toBe('unavailable');
+  });
+});
+
+describe('searchDimensionValues', () => {
+  it('finds the values of host, path, address and user agent containing the text, within the range and filters', async () => {
+    ch.rows = (query) => (query.includes('splitByChar') ? [{ value: '/api/suggest', c: '42' }, { value: '/suggest', c: 7 }] : []);
+    const result = await searchDimensionValues({
+      range: resolveRange({ range: '24h' }, NOW),
+      filters: parseFilters([{ dim: 'status', value: '5xx' }]),
+      query: 'SUGGEST',
+      limit: 5,
+    });
+    expect(result.status).toBe('ok');
+    expect(result.dimensions.map((group) => group.dimension)).toEqual(['host', 'path', 'ip', 'user_agent']);
+    expect(result.dimensions[1].values).toEqual([{ value: '/api/suggest', count: 42 }, { value: '/suggest', count: 7 }]);
+    expect(ch.calls).toHaveLength(4);
+    for (const call of ch.calls) {
+      expect(call.query).toContain('positionCaseInsensitiveUTF8(');
+      expect(call.query).not.toContain('SUGGEST');
+      expect(call.query_params).toMatchObject({ p_q: 'SUGGEST', p_limit: 5, f0: 5 });
+    }
+  });
+
+  it('validates the text and the limit', () => {
+    expect(() => parseValueQuery('  ')).toThrow(/q is required/);
+    expect(() => parseValueQuery('x'.repeat(257))).toThrow(/at most 256/);
+    expect(parseValueQuery(' suggest ')).toBe('suggest');
+    expect(parseValueLimit(undefined)).toBe(5);
+    expect(() => parseValueLimit('9')).toThrow();
+  });
+});
+
+describe('queryHostWafRules', () => {
+  it("lists the rules that matched one host's names, most frequent first", async () => {
+    ch.rows = () => [{ rule_id: 942100, events: '12', blocked_events: 3, message: 'SQL Injection', top_path: ['/search'] }];
+    const result = await queryHostWafRules({ range: resolveRange({ range: '7d' }, NOW), domains: ['App.Example.com', '*.example.com'], limit: 5 });
+    expect(result).toEqual({ status: 'ok', rules: [{ ruleId: 942100, message: 'SQL Injection', events: 12, blocked: 3, topPath: '/search' }] });
+    // Wildcards are left out; the names are compared as stored (lowercase).
+    expect(ch.calls[0].query_params).toMatchObject({ p_hosts: ['app.example.com'], p_limit: 5 });
+    expect((await queryHostWafRules({ range: resolveRange({ range: '7d' }, NOW), domains: ['*.example.com'], limit: 5 })).rules).toEqual([]);
   });
 });

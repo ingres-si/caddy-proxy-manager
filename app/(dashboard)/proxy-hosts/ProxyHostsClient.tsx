@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, MoreHorizontal, Plus, Search, Server } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, MoreHorizontal, Plus, Server } from "lucide-react";
 import { toast } from "sonner";
 import type { AccessList } from "@/lib/models/access-lists";
 import type { CertificatePickerOption } from "@/lib/certificate-api";
@@ -30,6 +30,7 @@ import { bulkProxyHostsAction, type BulkOperation } from "./bulk-actions";
 import { NEW_HOST_HREF, hostEditorHref, hostHref } from "./links";
 import { CertificateSummary, HostStatus, ProtectionPills, TagChips } from "./host-parts";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ListSearchField } from "@/components/ui/ListSearchField";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Banner } from "@/components/ui/Banner";
@@ -286,15 +287,20 @@ export default function ProxyHostsClient({
     router.push(rest ? `${pathname}?${rest}` : pathname);
   }
 
+  // Typing replaces the address instead of adding a history entry per word, keeps the scroll
+  // position, and shows a spinner in the field until the list has caught up.
+  const [searching, startSearch] = useTransition();
   function handleSearchChange(value: string) {
     setSearchTerm(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      pushParams((params) => {
-        if (value.trim()) params.set("search", value.trim());
-        else params.delete("search");
-      });
-    }, 400);
+      const params = new URLSearchParams(searchParams.toString());
+      if (value.trim()) params.set("search", value.trim());
+      else params.delete("search");
+      params.delete("page");
+      const rest = params.toString();
+      startSearch(() => router.replace(rest ? `${pathname}?${rest}` : pathname, { scroll: false }));
+    }, 250);
   }
 
   function handleStatusChange(value: StatusFilter) {
@@ -469,17 +475,14 @@ export default function ProxyHostsClient({
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2.5">
-            <label className="flex h-[38px] min-w-0 flex-[1_1_280px] items-center gap-2 rounded-[10px] border border-line bg-panel px-3 text-soft focus-within:border-brand">
-              <Search aria-hidden="true" className="h-4 w-4 shrink-0" />
-              <span className="sr-only">Filter hosts</span>
-              <input
-                type="search"
-                value={searchTerm}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder="Domain, upstream or tag"
-                className="h-full min-w-0 flex-1 border-0 bg-transparent text-sm text-foreground outline-none placeholder:text-soft"
-              />
-            </label>
+            <ListSearchField
+              className="flex-[1_1_280px]"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              placeholder="Domain, upstream or tag"
+              label="Filter hosts"
+              pending={searching}
+            />
             <SegmentedControl<StatusFilter>
               label="Status"
               value={query.status}

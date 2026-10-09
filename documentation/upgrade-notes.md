@@ -2,6 +2,14 @@
 
 Pull the new images and recreate the containers with `docker compose pull && docker compose up -d`. (`docker compose restart` does not re-read `.env`.)
 
+## Upgrading to v2.4.0
+
+- **A host's Security tab manages its rule exclusions in place**: add (finding the rule by id or name), change and remove them there, also those limited to a path or variable; the rules that matched the host in the last 7 days are listed with **Exclude…**. The rarely changed WAF settings (global settings, Core Rule Set, body limits, custom directives) are under **Advanced**. Rate limiting reads *Global limits*, *Global and this host's*, *This host's only*.
+- **Analytics filters by part of a name**: the filter box finds hosts, paths, addresses and user agents containing what you type (`GET /api/v1/analytics/values`), and filters take `contains` and `not_contains` (`~path:…` in the address).
+- **Choosing hosts by typing**: the WAF exclusion form and the alert rule editor search names and domains.
+- Analytics questions can ask about the last N minutes. AI providers that reason (OpenAI-compatible) get room to answer (4096 output tokens).
+- **Dismiss on an open alert dismisses it at once** (until it resolves); dismissing for a while and muting the rule are in the menu next to it.
+
 ## Upgrading to v2.3.0
 
 - **Built-in alert rules.** Every install gets rules for expiring certificates, a failed Caddy apply, server errors, failing upstreams, failed backups and the fleet (WAF block spike is added disabled). They notify nobody until you choose channels in them; what they find is listed on **Alerts** and under **Needs attention**. A rule type you already had a rule for gets no built-in one. See [built-in rules](../ee/docs/alerting.md#built-in-rules).

@@ -68,7 +68,7 @@ export default async function AlertsPage({ searchParams }: PageProps) {
       digest={digest}
       aiConfigured={ai.configured}
       canWrite={canWrite}
-      proxyHosts={hosts.map((host) => ({ id: host.id, name: host.name || host.domains[0] || `Host #${host.id}` })).sort((a, b) => a.name.localeCompare(b.name))}
+      proxyHosts={hosts.map((host) => ({ id: host.id, name: host.name || host.domains[0] || `Host #${host.id}`, domains: host.domains })).sort((a, b) => a.name.localeCompare(b.name))}
       now={now}
     />
   );

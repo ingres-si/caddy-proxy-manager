@@ -1,14 +1,22 @@
 "use client";
 
-import { useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { ChevronLeft, Filter as FilterIcon, Plus, X } from "lucide-react";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { ChevronLeft, Filter as FilterIcon, Plus, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
-export type FilterOperator = "is" | "is not";
+export type FilterOperator = "is" | "is not" | "contains" | "does not contain";
+
+/** The operator that does the opposite: "is" and "is not", "contains" and "does not contain". */
+export function oppositeOperator(operator: FilterOperator): FilterOperator {
+  return operator === "is" ? "is not" : operator === "is not" ? "is" : operator === "contains" ? "does not contain" : "contains";
+}
+
+/** Values found for a search, grouped by dimension, with how many requests have each. */
+export type FilterSearchResult = { dimension: string; values: { value: string; count: number }[] }[];
 
 /** One filter: a dimension (by key), whether it includes or excludes, and the value. */
 export type ActiveFilter = {
@@ -28,6 +36,8 @@ export type FilterDimension = {
   mono?: boolean;
   /** Placeholder of the value field, e.g. "app.example.com". */
   placeholder?: string;
+  /** The dimension can be matched by part of its text ("contains"). */
+  searchable?: boolean;
 };
 
 export type FilterChipProps = {
@@ -37,13 +47,16 @@ export type FilterChipProps = {
   value: string;
   /** Shows a remove button (labelled "Remove filter: Host is app.example.com"). */
   onRemove?: () => void;
+  /** Makes the operator a button that turns the filter around (is ↔ is not, contains ↔ does not contain). */
+  onInvert?: () => void;
   /** Mono value. Default true. */
   mono?: boolean;
   className?: string;
 };
 
 /** "Host · is · app.example.com": a filter in effect, with an optional remove button. */
-export function FilterChip({ dimension, operator, value, onRemove, mono = true, className }: FilterChipProps) {
+export function FilterChip({ dimension, operator, value, onRemove, onInvert, mono = true, className }: FilterChipProps) {
+  const positive = operator === "is" || operator === "contains";
   return (
     <span
       className={cn(
@@ -53,7 +66,19 @@ export function FilterChip({ dimension, operator, value, onRemove, mono = true, 
       )}
     >
       <span className="shrink-0 text-muted-foreground">{dimension}</span>
-      <span className={cn("shrink-0 font-semibold", operator === "is" ? "text-brand" : "text-waf-ink")}>{operator}</span>
+      {onInvert ? (
+        <button
+          type="button"
+          onClick={onInvert}
+          title={`Change to "${oppositeOperator(operator)}"`}
+          aria-label={`${dimension} ${operator} ${value}: change to ${oppositeOperator(operator)}`}
+          className={cn("shrink-0 rounded px-0.5 font-semibold underline-offset-4 hover:underline", positive ? "text-brand" : "text-waf-ink")}
+        >
+          {operator}
+        </button>
+      ) : (
+        <span className={cn("shrink-0 font-semibold", positive ? "text-brand" : "text-waf-ink")}>{operator}</span>
+      )}
       <span className={cn("min-w-0 truncate", mono && "num")}>{value}</span>
       {onRemove && (
         <button
@@ -77,6 +102,15 @@ export type FilterBarProps = {
   onAdd?: (filter: ActiveFilter) => void;
   /** Called when a chip's remove button is pressed. Without it chips have no remove button. */
   onRemove?: (filter: ActiveFilter, index: number) => void;
+  /** Called when a chip's operator is clicked, with the filter turned around. Without it the operator is plain text. */
+  onInvert?: (filter: ActiveFilter, index: number) => void;
+  /**
+   * Finds values containing the typed text (debounced). With it the bar has a
+   * search box: "contains" choices for the searchable dimensions and the
+   * values found, each one click from a filter; the dimension menu becomes
+   * "More filters".
+   */
+  onSearch?: (query: string) => Promise<FilterSearchResult>;
   /** Content at the end of the row, e.g. the live status and a "Save view" link. */
   trailing?: ReactNode;
   /** Text of the add button. Default "Add filter". */
@@ -96,6 +130,8 @@ export function FilterBar({
   dimensions,
   onAdd,
   onRemove,
+  onInvert,
+  onSearch,
   trailing,
   addLabel = "Add filter",
   label = "Filters",
@@ -119,10 +155,12 @@ export function FilterBar({
             value={filter.value}
             mono={dimension?.mono ?? true}
             onRemove={onRemove ? () => onRemove(filter, index) : undefined}
+            onInvert={onInvert ? () => onInvert({ ...filter, operator: oppositeOperator(filter.operator) }, index) : undefined}
           />
         );
       })}
-      {onAdd && dimensions.length > 0 && <AddFilter dimensions={dimensions} onAdd={onAdd} label={addLabel} />}
+      {onAdd && onSearch && <SearchFilter dimensions={dimensions} onAdd={onAdd} onSearch={onSearch} />}
+      {onAdd && dimensions.length > 0 && <AddFilter dimensions={dimensions} onAdd={onAdd} label={onSearch ? "More filters" : addLabel} />}
       {trailing && <div className="ml-auto flex flex-wrap items-center gap-3.5 text-[13px] text-soft">{trailing}</div>}
     </div>
   );
@@ -221,6 +259,12 @@ function AddFilter({ dimensions, onAdd, label }: { dimensions: readonly FilterDi
               options={[
                 { value: "is", label: "is" },
                 { value: "is not", label: "is not" },
+                ...(picked.searchable
+                  ? [
+                      { value: "contains" as const, label: "contains" },
+                      { value: "does not contain" as const, label: "does not contain" },
+                    ]
+                  : []),
               ]}
               className="self-start"
             />
@@ -254,5 +298,148 @@ function AddFilter({ dimensions, onAdd, label }: { dimensions: readonly FilterDi
         )}
       </PopoverContent>
     </Popover>
+  );
+}
+
+type SearchChoice = { key: string; filter: ActiveFilter; label: ReactNode; count?: number };
+
+/**
+ * The search box of the filter bar: type part of a host, path, address or
+ * user agent, then pick "… contains <text>" or one of the values found
+ * (most requested first). Enter takes the highlighted choice.
+ */
+function SearchFilter({ dimensions, onAdd, onSearch }: { dimensions: readonly FilterDimension[]; onAdd: (filter: ActiveFilter) => void; onSearch: (query: string) => Promise<FilterSearchResult> }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [results, setResults] = useState<FilterSearchResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [active, setActive] = useState(0);
+  const listId = useId();
+  const run = useRef(0);
+  const byKey = new Map(dimensions.map((dimension) => [dimension.key, dimension]));
+  const text = query.trim();
+
+  useEffect(() => {
+    if (!text) {
+      setResults(null);
+      setLoading(false);
+      return;
+    }
+    const id = ++run.current;
+    setLoading(true);
+    const timer = setTimeout(() => {
+      onSearch(text)
+        .then((found) => id === run.current && setResults(found))
+        .catch(() => id === run.current && setResults([]))
+        .finally(() => id === run.current && setLoading(false));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [text, onSearch]);
+
+  const choices: SearchChoice[] = text
+    ? [
+        ...dimensions
+          // Until the search answers, every searchable dimension; then only those with a match.
+          .filter((dimension) => dimension.searchable && (results === null || results.some((group) => group.dimension === dimension.key && group.values.length > 0)))
+          .map((dimension) => ({
+            key: `contains-${dimension.key}`,
+            filter: { dimension: dimension.key, operator: "contains" as const, value: text },
+            label: (
+              <>
+                <span className="text-muted-foreground">{dimension.label}</span> <span className="font-semibold text-brand">contains</span>{" "}
+                <span className={cn((dimension.mono ?? true) && "num")}>{text}</span>
+              </>
+            ),
+          })),
+        ...(results ?? []).flatMap((group) =>
+          group.values.map((found) => {
+            const dimension = byKey.get(group.dimension);
+            return {
+              key: `value-${group.dimension}-${found.value}`,
+              filter: { dimension: group.dimension, operator: "is" as const, value: found.value },
+              count: found.count,
+              label: (
+                <>
+                  <span className="text-muted-foreground">{dimension?.label ?? group.dimension}</span>{" "}
+                  <span className={cn("min-w-0 truncate", (dimension?.mono ?? true) && "num")}>{found.value}</span>
+                </>
+              ),
+            };
+          })
+        ),
+      ]
+    : [];
+  const index = Math.min(active, Math.max(0, choices.length - 1));
+
+  function pick(choice: SearchChoice | undefined) {
+    if (!choice) return;
+    onAdd(choice.filter);
+    setQuery("");
+    setOpen(false);
+    setActive(0);
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (choices.length > 0) setActive((index + (event.key === "ArrowDown" ? 1 : -1) + choices.length) % choices.length);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      pick(choices[index]);
+    } else if (event.key === "Escape") {
+      setOpen(false);
+    }
+  }
+
+  const showList = open && text.length > 0;
+  return (
+    <div className="relative min-w-[220px] flex-[1_1_260px]">
+      <label className="flex h-[30px] items-center gap-1.5 rounded-lg border border-line2 bg-panel2 px-2.5 focus-within:border-brand">
+        <Search aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-soft" />
+        <span className="sr-only">Search values to filter by</span>
+        <input
+          role="combobox"
+          aria-expanded={showList}
+          aria-controls={listId}
+          aria-activedescendant={showList && choices[index] ? `${listId}-${index}` : undefined}
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+            setActive(0);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setOpen(false)}
+          onKeyDown={onKeyDown}
+          placeholder="Filter by host, path, IP or user agent…"
+          autoComplete="off"
+          spellCheck={false}
+          className="h-full min-w-0 flex-1 border-0 bg-transparent text-[13px] text-foreground outline-none placeholder:text-soft"
+        />
+      </label>
+      {showList && (
+        <ul id={listId} role="listbox" aria-label="Filters to add" className="absolute left-0 top-full z-50 m-0 mt-1 max-h-80 w-full min-w-[320px] list-none overflow-y-auto rounded-lg border border-line2 bg-panel p-1 shadow-overlay">
+          {choices.map((choice, i) => (
+            <li
+              key={choice.key}
+              id={`${listId}-${i}`}
+              role="option"
+              aria-selected={i === index}
+              onMouseEnter={() => setActive(i)}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => pick(choice)}
+              className={cn("flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px]", i === index && "bg-raise")}
+            >
+              <span className="flex min-w-0 flex-1 items-baseline gap-1 truncate">{choice.label}</span>
+              {choice.count !== undefined && <span className="num shrink-0 text-xs text-soft">{choice.count.toLocaleString("en-US")}</span>}
+            </li>
+          ))}
+          {loading && <li className="px-2.5 py-1.5 text-xs text-soft">Searching…</li>}
+          {!loading && results !== null && results.every((group) => group.values.length === 0) && (
+            <li className="px-2.5 py-1.5 text-xs text-soft">No host, path, address or user agent in this period contains “{text}”.</li>
+          )}
+        </ul>
+      )}
+    </div>
   );
 }

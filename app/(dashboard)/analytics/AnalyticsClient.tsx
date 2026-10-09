@@ -9,7 +9,7 @@
  * from /api/v1/analytics; short ranges refresh every 30 seconds while the
  * tab is visible.
  */
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Download, ServerOff } from "lucide-react";
@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Banner } from "@/components/ui/Banner";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { FilterBar, type ActiveFilter, type FilterDimension } from "@/components/ui/FilterBar";
+import { FilterBar, type ActiveFilter, type FilterDimension, type FilterOperator, type FilterSearchResult } from "@/components/ui/FilterBar";
 import { KpiTile } from "@/components/ui/KpiTile";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
@@ -55,6 +55,8 @@ import {
   addFilter,
   effectiveGrouping,
   filterValueError,
+  isSearchableDimension,
+  MAX_CONTAINS_LENGTH,
   listParams,
   matchesSavedView,
   normalizeFilterValue,
@@ -270,6 +272,10 @@ function AnalyticsOff({ canReadSettings }: { canReadSettings: boolean }) {
   );
 }
 
+/** The filter bar's operator words and the API's filter ops. */
+const OP_OF_OPERATOR: Record<FilterOperator, FilterOp> = { is: "is", "is not": "is_not", contains: "contains", "does not contain": "not_contains" };
+const OPERATOR_OF_OP: Record<FilterOp, FilterOperator> = { is: "is", is_not: "is not", contains: "contains", not_contains: "does not contain" };
+
 export default function AnalyticsClient({
   analyticsEnabled,
   loggingEnabled,
@@ -306,8 +312,17 @@ export default function AnalyticsClient({
 
   /** Adds a filter; returns the state it navigated to, or null when the filter was refused. */
   const addFilterTo = (dim: Dimension, op: FilterOp, raw: string): ViewState | null => {
-    const value = normalizeFilterValue(dim, raw);
-    const problem = filterValueError(dim, value);
+    const contains = op === "contains" || op === "not_contains";
+    const value = contains ? raw.trim() : normalizeFilterValue(dim, raw);
+    const problem = contains
+      ? !isSearchableDimension(dim)
+        ? `${DIMENSION_LABEL[dim]} cannot be matched by part of its text`
+        : !value
+          ? "Type what to look for"
+          : value.length > MAX_CONTAINS_LENGTH
+            ? `At most ${MAX_CONTAINS_LENGTH} characters`
+            : null
+      : filterValueError(dim, value);
     if (problem) {
       toast.error(problem);
       return null;
@@ -356,16 +371,31 @@ export default function AnalyticsClient({
   const activeView: AnalyticsSavedView | null =
     state.viewId === null ? null : (views.views.find((view) => view.id === state.viewId && matchesSavedView(state, view)) ?? null);
 
+  // The values containing what is typed in the filter box, within the range and filters on the page.
+  const searchParamsText = listParams(state).toString();
+  const searchValues = useCallback(
+    async (q: string): Promise<FilterSearchResult> => {
+      const params = new URLSearchParams(searchParamsText);
+      params.set("q", q);
+      const response = await fetch(`/api/v1/analytics/values?${params.toString()}`, { headers: { Accept: "application/json" } });
+      if (!response.ok) return [];
+      const body = (await response.json()) as { dimensions?: { dimension: string; values: { value: string; count: number }[] }[] };
+      return (body.dimensions ?? []).map((group) => ({ dimension: group.dimension, values: group.values }));
+    },
+    [searchParamsText]
+  );
+
   const filterDimensions: FilterDimension[] = DIMENSIONS.map((dim) => ({
     key: dim,
     label: DIMENSION_LABEL[dim],
     suggestions: suggestions[dim],
     placeholder: DIMENSION_PLACEHOLDER[dim],
     mono: dim !== "user_agent",
+    searchable: isSearchableDimension(dim),
   }));
   const activeFilters: ActiveFilter[] = state.filters.map((f) => ({
     dimension: f.dim,
-    operator: f.op === "is_not" ? "is not" : "is",
+    operator: OPERATOR_OF_OP[f.op],
     value: f.value,
   }));
 
@@ -484,8 +514,10 @@ export default function AnalyticsClient({
       <FilterBar
         filters={activeFilters}
         dimensions={filterDimensions}
-        onAdd={(filter) => addFilterTo(filter.dimension as Dimension, filter.operator === "is not" ? "is_not" : "is", filter.value)}
+        onAdd={(filter) => addFilterTo(filter.dimension as Dimension, OP_OF_OPERATOR[filter.operator], filter.value)}
         onRemove={(_, index) => update({ filters: state.filters.filter((__, i) => i !== index) })}
+        onInvert={(filter, index) => update({ filters: state.filters.map((f, i) => (i === index ? { ...f, op: OP_OF_OPERATOR[filter.operator] } : f)) })}
+        onSearch={searchValues}
         trailing={
           <>
             {state.filters.length > 0 && (

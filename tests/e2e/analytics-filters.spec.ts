@@ -96,18 +96,31 @@ test.describe('Analytics filters', () => {
 
       // The filter bar adds one by hand, and refuses a value the API would.
       const bar = page.getByRole('group', { name: 'Filters' });
-      await bar.getByRole('button', { name: 'Add filter' }).click();
+      await bar.getByRole('button', { name: 'More filters' }).click();
       await page.getByRole('group', { name: 'Filter by' }).getByRole('button', { name: 'Country', exact: true }).click();
       await page.getByLabel('Country value').fill('Germany');
       await page.getByRole('button', { name: 'Add', exact: true }).click();
       await expect(page.getByText('Country must be a two-letter code, LAN or XX')).toBeVisible();
 
-      await bar.getByRole('button', { name: 'Add filter' }).click();
+      await bar.getByRole('button', { name: 'More filters' }).click();
       await page.getByRole('group', { name: 'Filter by' }).getByRole('button', { name: 'Host', exact: true }).click();
       await page.getByLabel('Host value').fill(hostB);
       await page.getByRole('button', { name: 'Add', exact: true }).click();
       await expect(page.getByRole('button', { name: `Remove filter: Host is ${hostB}` })).toBeVisible();
       await expect(hostsPanel(page).getByText(hostA, { exact: true })).not.toBeVisible({ timeout: 15_000 });
+      await page.getByRole('button', { name: `Remove filter: Host is ${hostB}` }).click();
+
+      // The search box finds hosts by part of their name: "contains", or one of the hosts found.
+      const search = bar.getByRole('combobox', { name: 'Search values to filter by' });
+      await search.fill(hostB.slice(0, 6));
+      const found = page.getByRole('listbox', { name: 'Filters to add' });
+      await expect(found.getByRole('option', { name: new RegExp(`Host\\s+${hostB.replace(/[.]/g, '\\.')}`) })).toBeVisible({ timeout: 15_000 });
+      await found.getByRole('option', { name: /Host contains/ }).click();
+      await expect(page).toHaveURL(/filter=%7Ehost/);
+      // Clicking the operator turns the filter around.
+      await bar.getByRole('button', { name: new RegExp(`Host contains .*: change to does not contain`) }).click();
+      await expect(page).toHaveURL(/filter=%21%7Ehost/);
+      await bar.getByRole('button', { name: /Remove filter: Host does not contain/ }).click();
 
       // Clear filters removes every filter, the starting path one included.
       await bar.getByRole('button', { name: 'Clear filters' }).click();

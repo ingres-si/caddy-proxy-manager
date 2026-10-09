@@ -269,6 +269,7 @@ Every guard of a route, page or server action and the permission it checks. Rout
 | `app/(dashboard)/waf/actions.ts` | `setWafHostModeAction` | `waf:write` |
 | `app/(dashboard)/waf/actions.ts` | `createWafExclusionAction` | `waf:write` |
 | `app/(dashboard)/waf/actions.ts` | `createWafExclusionsAction` | `waf:write` |
+| `app/(dashboard)/waf/actions.ts` | `updateWafExclusionAction` | `waf:write` |
 | `app/(dashboard)/waf/actions.ts` | `deleteWafExclusionAction` | `waf:write` |
 | `app/(dashboard)/waf/actions.ts` | `explainWafEventAction` | `waf:read` |
 | `app/(dashboard)/waf/page.tsx` | `WafPage` | `waf:read` |
@@ -353,6 +354,7 @@ Every guard of a route, page or server action and the permission it checks. Rout
 | `app/api/v1/analytics/security/sources/route.ts` | `GET` | `analytics:read` |
 | `app/api/v1/analytics/signals/route.ts` | `GET` | `analytics:read` |
 | `app/api/v1/analytics/top/route.ts` | `GET` | `analytics:read` |
+| `app/api/v1/analytics/values/route.ts` | `GET` | `analytics:read` |
 | `app/api/v1/analytics/views/[id]/route.ts` | `GET` | `analytics:read` |
 | `app/api/v1/analytics/views/[id]/route.ts` | `PATCH` | `analytics:read` |
 | `app/api/v1/analytics/views/[id]/route.ts` | `DELETE` | `analytics:read` |

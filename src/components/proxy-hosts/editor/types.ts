@@ -104,6 +104,13 @@ export type HostEditorData = {
   /** CRS rule messages seen in WAF events, by rule id. */
   wafRuleMessages: Record<number, string>;
   canReadWaf: boolean;
+  /**
+   * The WAF rules that matched this host's requests in the last 7 days, most
+   * frequent first (waf:read and analytics on); null when unknown.
+   */
+  wafRecentRules?: { ruleId: number; message: string | null; events: number; blocked: number; topPath: string | null }[] | null;
+  /** The user may add, change and remove WAF exclusions (waf:write). */
+  canWriteWaf?: boolean;
   rateLimitDefaults: { enabled: boolean; rules: number } | null;
   geoblockGlobal: { enabled: boolean } | null;
   /** A default DNS provider exists, so Caddy can obtain wildcard certificates. */

@@ -269,7 +269,7 @@ test.describe('Proxy host editor', () => {
   test('per-host geo blocking override mode persists after save', async ({ page }) => {
     await openNewHost(page);
     await fillHostBasics(page, { name: 'Geoblock Override Host', domain: 'geoblock-override.local', upstream: 'localhost:9991' });
-    await openEditorSection(page, 'Access');
+    await openEditorSection(page, 'Security');
     await setEditorSwitch(page, 'Geo blocking for this host', true);
     const rules = page.getByRole('group', { name: 'Rules', exact: true });
     await rules.getByRole('button', { name: 'Override global' }).click();
@@ -277,7 +277,7 @@ test.describe('Proxy host editor', () => {
     try {
       expect((await getHost(page, id)).geoblockMode).toBe('override');
 
-      await openHostEditor(page, id, 'Access');
+      await openHostEditor(page, id, 'Security');
       await expect(page.getByRole('group', { name: 'Rules', exact: true }).getByRole('button', { name: 'Override global' })).toHaveAttribute('aria-pressed', 'true');
       await page.getByRole('group', { name: 'Rules', exact: true }).getByRole('button', { name: 'Merge with global' }).click();
       await saveHostEditor(page);

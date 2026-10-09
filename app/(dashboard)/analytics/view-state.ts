@@ -9,7 +9,8 @@
  *   metric=requests|bytes|visitors|mitigated|errors
  *   group=none|outcome|status|host  (only the groupings the metric allows)
  *   compare=0                     hides the previous period
- *   filter=host:app.example.com   one per filter; a leading "!" excludes
+ *   filter=host:app.example.com   one per filter; a leading "!" excludes,
+ *                                 "~path:…" contains, "!~path:…" does not contain
  *   filters=[{"dim","op","value"}] also read: the API's JSON format, as other
  *                                 pages (Security events, Overview) link here
  *   view=12                       the saved view these settings came from
@@ -87,6 +88,15 @@ function isMetric(value: unknown): value is Metric {
   return typeof value === "string" && (METRICS as readonly string[]).includes(value);
 }
 
+/** Dimensions a "contains" filter can search (src/lib/analytics/dimensions.ts SEARCHABLE_SQL). */
+export const SEARCHABLE_DIMENSIONS: readonly Dimension[] = ["host", "path", "user_agent", "ip"];
+/** Longest text a "contains" filter searches for. */
+export const MAX_CONTAINS_LENGTH = 256;
+
+export function isSearchableDimension(dim: Dimension): boolean {
+  return SEARCHABLE_DIMENSIONS.includes(dim);
+}
+
 function isDimension(value: unknown): value is Dimension {
   return typeof value === "string" && (DIMENSIONS as readonly string[]).includes(value);
 }
@@ -114,20 +124,25 @@ export function validCustomRange(from: number | null, to: number | null, now = M
 
 // ── Filters ──────────────────────────────────────────────────────────────
 
-/** "host:app.example.com", or "!host:…" for "is not". */
+/** "host:app.example.com"; "!host:…" for "is not", "~path:…" for "contains", "!~path:…" for "does not contain". */
 export function encodeFilter(filter: AnalyticsFilter): string {
-  return `${filter.op === "is_not" ? "!" : ""}${filter.dim}:${filter.value}`;
+  const prefix = filter.op === "is_not" ? "!" : filter.op === "contains" ? "~" : filter.op === "not_contains" ? "!~" : "";
+  return `${prefix}${filter.dim}:${filter.value}`;
 }
 
 /** The filter in a `filter` parameter, or null when it is malformed or its value is invalid. */
 export function decodeFilter(text: string): AnalyticsFilter | null {
-  const op = text.startsWith("!") ? "is_not" : "is";
-  const body = op === "is_not" ? text.slice(1) : text;
+  const op: AnalyticsFilter["op"] = text.startsWith("!~") ? "not_contains" : text.startsWith("~") ? "contains" : text.startsWith("!") ? "is_not" : "is";
+  const body = text.slice(op === "not_contains" ? 2 : op === "is" ? 0 : 1);
   const colon = body.indexOf(":");
   if (colon <= 0) return null;
   const dim = body.slice(0, colon);
   const raw = body.slice(colon + 1);
   if (!isDimension(dim)) return null;
+  if (op === "contains" || op === "not_contains") {
+    const value = raw.trim();
+    return value && isSearchableDimension(dim) && value.length <= MAX_CONTAINS_LENGTH ? { dim, op, value } : null;
+  }
   const value = normalizeFilterValue(dim, raw);
   if (!value || filterValueError(dim, value)) return null;
   return { dim, op, value };
@@ -199,7 +214,7 @@ export function addFilter(filters: readonly AnalyticsFilter[], filter: Analytics
 
 /**
  * The filters of a `filters` parameter in the API's JSON format
- * ([{ dim, op: "is" | "is_not", value }]); entries off the allow-lists are
+ * ([{ dim, op: "is" | "is_not" | "contains" | "not_contains", value }]); entries off the allow-lists are
  * skipped.
  */
 export function decodeFiltersJson(text: string | null): AnalyticsFilter[] {
@@ -216,8 +231,20 @@ export function decodeFiltersJson(text: string | null): AnalyticsFilter[] {
     if (!item || typeof item !== "object" || Array.isArray(item)) continue;
     const { dim, op, value } = item as Record<string, unknown>;
     if (!isDimension(dim) || (typeof value !== "string" && typeof value !== "number")) continue;
-    const parsedOp = op === undefined || op === null || op === "is" ? "is" : op === "is_not" || op === "is not" || op === "not" ? "is_not" : null;
+    const parsedOp =
+      op === undefined || op === null || op === "is"
+        ? "is"
+        : op === "is_not" || op === "is not" || op === "not"
+          ? "is_not"
+          : op === "contains" || op === "not_contains"
+            ? op
+            : null;
     if (!parsedOp) continue;
+    if (parsedOp === "contains" || parsedOp === "not_contains") {
+      const text = String(value).trim();
+      if (text && isSearchableDimension(dim) && text.length <= MAX_CONTAINS_LENGTH) out.push({ dim, op: parsedOp, value: text });
+      continue;
+    }
     const normalized = normalizeFilterValue(dim, String(value));
     if (!normalized || filterValueError(dim, normalized)) continue;
     out.push({ dim, op: parsedOp, value: normalized });
@@ -328,7 +355,11 @@ export function stateFromSavedView(view: Pick<AnalyticsSavedView, "id" | "range"
   const group = view.groupBy && METRIC_GROUPINGS[metric].includes(view.groupBy) ? view.groupBy : null;
   const filters: AnalyticsFilter[] = [];
   for (const filter of view.filters) {
-    if (isDimension(filter.dim) && filters.length < MAX_FILTERS) filters.push({ dim: filter.dim, op: filter.op === "is_not" ? "is_not" : "is", value: filter.value });
+    if (isDimension(filter.dim) && filters.length < MAX_FILTERS) {
+      const op = filter.op === "is_not" || filter.op === "contains" || filter.op === "not_contains" ? filter.op : "is";
+      if ((op === "contains" || op === "not_contains") && !isSearchableDimension(filter.dim)) continue;
+      filters.push({ dim: filter.dim, op, value: filter.value });
+    }
   }
   return { ...range, metric, group, compare, filters, viewId: view.id };
 }

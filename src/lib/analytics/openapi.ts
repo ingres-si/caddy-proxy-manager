@@ -63,8 +63,8 @@ const filtersParam = {
   schema: { type: "string" },
   example: '[{"dim":"host","op":"is","value":"app.example.com"},{"dim":"status","op":"is","value":"5xx"}]',
   description:
-    `JSON array of at most ${MAX_FILTERS} filters (schema AnalyticsFilter). Several "is" filters on one dimension match any ` +
-    'of their values; "is_not" filters exclude each value; filters on different dimensions all apply.',
+    `JSON array of at most ${MAX_FILTERS} filters (schema AnalyticsFilter). Several "is" and "contains" filters on one dimension ` +
+    'match any of them; "is_not" and "not_contains" filters exclude each; filters on different dimensions all apply.',
 };
 
 const limitParam = (fallback: number, max: number) => ({
@@ -133,6 +133,14 @@ export const ANALYTICS_OPENAPI_PATHS = {
       limitParam(6, MAX_TOP_LIMIT),
     ],
     "AnalyticsTopResult"
+  ),
+  "/api/v1/analytics/values": read(
+    "Search the values of the dimensions",
+    "searchAnalyticsValues",
+    "For host, path, ip and user_agent, the values containing q (any case) within the range and filters, most requested " +
+      "first: what to filter by when only part of a name or path is known. Filter by one with op is, or by the text with op contains.",
+    [...rangeParams("24h"), filtersParam, { name: "q", in: "query", required: true, schema: { type: "string", minLength: 1, maxLength: 256 } }, limitParam(5, 8)],
+    "AnalyticsValueSearchResult"
   ),
   "/api/v1/analytics/requests": read(
     "List the latest matching requests",
@@ -333,7 +341,8 @@ export const ANALYTICS_OPENAPI_SCHEMAS = {
         description:
           "host: as logged. path: without the query string. country: two-letter code, LAN or XX. asn: 13335 or AS13335. " +
           "status: a code (404) or a class (5xx). ip: one address. user_agent: a family such as \"Chrome · Windows\". " +
-          "outcome: an AnalyticsOutcome. waf_rule: a rule id.",
+          "outcome: an AnalyticsOutcome. waf_rule: a rule id. With contains or not_contains: part of the text, any case, " +
+          "on host, path, user_agent and ip only (at most 256 characters).",
       },
     },
     required: ["dim", "value"],
@@ -433,6 +442,26 @@ export const ANALYTICS_OPENAPI_SCHEMAS = {
       asOrg: { type: "string", description: "ip rows" },
     },
     required: ["value", "count", "share", "mitigated", "mitigatedShare"],
+  },
+  AnalyticsValueSearchResult: {
+    type: "object",
+    properties: {
+      status,
+      query: { type: "string" },
+      dimensions: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            dimension: { type: "string", enum: ["host", "path", "ip", "user_agent"] },
+            label: { type: "string" },
+            values: { type: "array", items: { type: "object", properties: { value: { type: "string" }, count: { type: "integer" } }, required: ["value", "count"] } },
+          },
+          required: ["dimension", "label", "values"],
+        },
+      },
+    },
+    required: ["status", "query", "dimensions"],
   },
   AnalyticsTopResult: {
     type: "object",

@@ -46,7 +46,9 @@ describe('first paint', () => {
     expect(pressed(html, '24h')).toBe(true);
     expect(html).toContain('Compare to previous period');
     expect(html).toContain('Export CSV');
-    expect(html).toContain('Add filter');
+    // A search box finds values to filter by; the dimension menu is "More filters".
+    expect(html).toContain('placeholder="Filter by host, path, IP or user agent…"');
+    expect(html).toContain('More filters');
     expect(html).toContain('Save view');
     expect(html).toContain('Requests by outcome');
     expect(html).toContain('aria-label="Group by"');

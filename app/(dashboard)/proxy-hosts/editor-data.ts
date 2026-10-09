@@ -4,6 +4,9 @@
  * context the review shows. Every list is reduced to the fields the editor
  * needs; nothing secret (PEM, keys, password hashes) reaches the client.
  */
+import { queryHostWafRules } from "@/src/lib/analytics/security";
+import { resolveRange } from "@/src/lib/analytics/range";
+import { isAnalyticsEnabled } from "@/src/lib/clickhouse/client";
 import { listProxyHosts, type ProxyHost } from "@/src/lib/models/proxy-hosts";
 import { listCertificates, type Certificate } from "@/src/lib/models/certificates";
 import { listCaCertificates } from "@/src/lib/models/ca-certificates";
@@ -132,6 +135,12 @@ export async function loadHostEditorData(
   const grants = host ? await getForwardAuthAccessForHost(host.id).catch(() => []) : [];
   const exclusions = host ? await listWafExclusions({ proxyHostId: host.id }) : [];
   const ruleIds = [...new Set([...exclusions.map((exclusion) => exclusion.ruleId), ...(template?.waf?.excluded_rule_ids ?? [])])];
+  // The rules that hit this host lately: what its Security tab offers to exclude.
+  const recent =
+    host && canReadWaf && isAnalyticsEnabled()
+      ? await queryHostWafRules({ range: resolveRange({ range: "7d" }), domains: host.domains, limit: 12 }).catch(() => null)
+      : null;
+  const wafRecentRules = recent && recent.status === "ok" ? recent.rules : null;
   const messages = ruleIds.length > 0 && canReadWaf ? await getWafRuleMessages(ruleIds).catch(() => ({})) : {};
 
   const usage = new Map<number, number>();
@@ -210,6 +219,8 @@ export async function loadHostEditorData(
       Object.entries(messages).filter((entry): entry is [string, string] => typeof entry[1] === "string")
     ) as Record<number, string>,
     canReadWaf,
+    canWriteWaf: can(access, "waf:write"),
+    wafRecentRules,
     rateLimitDefaults: rateLimit ? { enabled: Boolean(rateLimit.enabled), rules: rateLimit.rules.length } : null,
     geoblockGlobal: geoblock ? { enabled: Boolean(geoblock.enabled) } : null,
     dnsProviderConfigured: Boolean(dns?.default && dns.providers[dns.default]),

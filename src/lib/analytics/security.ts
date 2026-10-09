@@ -16,7 +16,7 @@ import {
   WAF_PATH_SQL,
   type Dimension,
 } from './dimensions';
-import { parseFilters, type AnalyticsFilter, type SqlFragment } from './filters';
+import { filterCondition, isContainsOp, parseFilters, type AnalyticsFilter, type SqlFragment } from './filters';
 import { initGeoIp, lookupIp } from './geoip';
 import { MITIGATED_OUTCOMES, isOutcome, type Outcome } from './outcome';
 import { OUTCOME_LABELS, type Series } from './query';
@@ -453,7 +453,9 @@ function eventFilterSql(filters: readonly AnalyticsFilter[], table: 'waf' | 'tra
   filters.forEach((filter, index) => {
     const name = `sf${index}`;
     let condition: string;
-    if (filter.dim === 'host') {
+    if (isContainsOp(filter.op)) {
+      condition = filterCondition(filter, name, params);
+    } else if (filter.dim === 'host') {
       params[name] = hostName(filter.value);
       condition = `${HOST_NAME_SQL} = {${name}:String}`;
     } else if (filter.dim === 'waf_rule') {
@@ -464,7 +466,7 @@ function eventFilterSql(filters: readonly AnalyticsFilter[], table: 'waf' | 'tra
       params[name] = compared.value;
       condition = `(${compared.sql}) = {${name}:${compared.type}}`;
     }
-    if (filter.op === 'is') include.set(filter.dim, [...(include.get(filter.dim) ?? []), condition]);
+    if (filter.op === 'is' || filter.op === 'contains') include.set(filter.dim, [...(include.get(filter.dim) ?? []), condition]);
     else exclude.push(`NOT (${condition})`);
   });
   const clauses = [...[...include.values()].map((list) => `(${list.join(' OR ')})`), ...exclude];
@@ -520,6 +522,37 @@ export async function querySecurityEvents(
           status: num(row.code),
         };
       }),
+    };
+  });
+}
+
+/** A WAF rule that matched a host's requests: how often, how often it blocked, and the path it matched most. */
+export type HostWafRule = { ruleId: number; message: string | null; events: number; blocked: number; topPath: string | null };
+
+/**
+ * The WAF rules that matched the requests to one host (its domain names)
+ * over `range`, most frequent first: what a host's Security tab offers to
+ * exclude. Wildcard names are left out (events carry the name requested).
+ */
+export async function queryHostWafRules(input: { range: ResolvedRange; domains: readonly string[]; limit: number }): Promise<{ status: AnalyticsStatus; rules: HostWafRule[] }> {
+  const names = [...new Set(input.domains.filter((domain) => !domain.includes('*')).map((domain) => hostName(domain)).filter(Boolean))];
+  const empty = { rules: [] as HostWafRule[] };
+  if (names.length === 0) return { ...empty, status: 'ok' };
+  return withAnalytics('host waf rules', empty, async () => {
+    const rows = await selectRows<Record<string, unknown>>(
+      `SELECT rule_id, count() AS events, countIf(blocked) AS blocked_events, any(rule_message) AS message, topK(1)(${WAF_PATH_SQL}) AS top_path
+       FROM waf_events WHERE ${timeWhere()} AND rule_id IS NOT NULL AND ${HOST_NAME_SQL} IN {p_hosts:Array(String)}
+       GROUP BY rule_id ORDER BY events DESC, rule_id LIMIT {p_limit:UInt32}`,
+      { ...baseParams(input.range), p_hosts: names, p_limit: input.limit }
+    );
+    return {
+      rules: rows.map((row) => ({
+        ruleId: num(row.rule_id),
+        message: row.message == null ? null : String(row.message),
+        events: num(row.events),
+        blocked: num(row.blocked_events),
+        topPath: Array.isArray(row.top_path) && row.top_path.length > 0 ? String(row.top_path[0]) : null,
+      })),
     };
   });
 }

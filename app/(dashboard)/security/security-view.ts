@@ -168,7 +168,7 @@ export function ruleCategory(ruleId: number): string | null {
 export type SecurityFilterDim = "host" | "waf_rule" | "ip" | "path" | "country";
 export const SECURITY_FILTER_DIMS: readonly SecurityFilterDim[] = ["host", "waf_rule", "ip", "path", "country"];
 
-export type SecurityFilter = { dim: string; op: "is" | "is_not"; value: string };
+export type SecurityFilter = { dim: string; op: "is" | "is_not" | "contains" | "not_contains"; value: string };
 
 /** What the page's URL holds. Absent values are the defaults (last 7 days, every source, no filters, page 1). */
 export type SecurityQuery = {
@@ -202,7 +202,8 @@ export function readFilters(raw: string | null | undefined): SecurityFilter[] {
     if (!item || typeof item !== "object") continue;
     const { dim, op, value } = item as Record<string, unknown>;
     if (typeof dim !== "string" || (typeof value !== "string" && typeof value !== "number")) continue;
-    out.push({ dim: dim.slice(0, 32), op: op === "is_not" || op === "is not" || op === "not" ? "is_not" : "is", value: String(value).slice(0, 512) });
+    const parsed = op === "is_not" || op === "is not" || op === "not" ? "is_not" : op === "contains" || op === "not_contains" ? op : "is";
+    out.push({ dim: dim.slice(0, 32), op: parsed, value: String(value).slice(0, 512) });
   }
   return out;
 }

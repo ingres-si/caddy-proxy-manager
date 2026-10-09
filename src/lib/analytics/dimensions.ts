@@ -169,6 +169,25 @@ export const DIMENSION_SPECS: Record<Dimension, DimensionSpec> = {
   },
 };
 
+/**
+ * Dimensions a filter can match by part of their text ("contains"), and the
+ * text each one searches: the host name, the path, the user agent family and
+ * the client address.
+ */
+export const SEARCHABLE_SQL: Partial<Record<Dimension, string>> = {
+  host: 'host',
+  path: PATH_SQL,
+  user_agent: UA_SQL,
+  ip: 'client_ip',
+};
+
+export function isSearchableDimension(dim: Dimension): boolean {
+  return SEARCHABLE_SQL[dim] !== undefined;
+}
+
+/** Longest text a "contains" filter searches for. */
+export const MAX_CONTAINS_LENGTH = 256;
+
 // ── Metrics ──────────────────────────────────────────────────────────────
 
 export const METRICS = ['requests', 'bytes', 'visitors', 'mitigated', 'errors'] as const;

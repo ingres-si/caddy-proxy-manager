@@ -8,7 +8,7 @@ import { getSetting, getWafSettings, saveWafSettings, clearSetting, setSetting, 
 import { SettingsValidationError, validateSettingsGroup } from "@/src/lib/settings-validation";
 import { withSettingsUpdateLock } from "@/src/lib/settings-update-lock";
 import { logAuditEvent } from "@/src/lib/audit";
-import { createWafExclusion, createWafExclusions, deleteWafExclusion, WafApplyError, type WafExclusion } from "@/src/lib/models/waf-exclusions";
+import { createWafExclusion, createWafExclusions, deleteWafExclusion, updateWafExclusion, WafApplyError, type WafExclusion } from "@/src/lib/models/waf-exclusions";
 import { readGlobalWafExclusionRows, restoreGlobalWafExclusionRows } from "@/src/lib/models/waf-exclusion-mirror";
 import { setWafHostMode, type WafHostView } from "@/src/lib/waf-hosts";
 import { isWafHostMode, type WafHostMode } from "@/src/lib/waf-host-mode";
@@ -154,6 +154,31 @@ export async function createWafExclusionsAction(inputs: WafExclusionActionInput[
     };
   } catch (error) {
     return failure(error, "Could not add the exclusions.");
+  }
+}
+
+/** Changes an exclusion's path, variable or reason (its rule and scope stay). */
+export async function updateWafExclusionAction(
+  id: number,
+  input: Pick<WafExclusionActionInput, "path" | "pathMatch" | "variable" | "reason">
+): Promise<WafActionResult<WafExclusion>> {
+  const session = await requirePermission("waf:write");
+  try {
+    const exclusion = await updateWafExclusion(
+      id,
+      {
+        path: input.path || null,
+        pathMatch: input.path ? input.pathMatch ?? undefined : undefined,
+        variable: input.variable || null,
+        ...(input.reason !== undefined ? { reason: input.reason } : {}),
+      },
+      Number(session.user.id),
+      { apply: applyCaddyConfig }
+    );
+    revalidateWaf();
+    return { ok: true, value: exclusion, message: `Exclusion of rule ${exclusion.ruleId} changed.` };
+  } catch (error) {
+    return failure(error, "Could not change the exclusion.");
   }
 }
 

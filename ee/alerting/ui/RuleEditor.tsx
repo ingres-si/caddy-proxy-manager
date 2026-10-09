@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Elastic-2.0
 "use client";
 
+import { HostMultiPicker } from "@/src/components/hosts/HostPicker";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Search } from "lucide-react";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { Banner } from "@/components/ui/Banner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,7 +28,7 @@ import {
 } from "@/ee/alerting/types";
 import { saveAlertRuleAction } from "./actions";
 
-export type HostChoice = { id: number; name: string };
+export type HostChoice = { id: number; name: string; domains?: string[] };
 
 type ScopeKind = "all" | "hosts";
 
@@ -173,16 +173,11 @@ export default function RuleEditor({ open, rule, onClose, channels, proxyHosts, 
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState<Form>(() => (rule ? formFromRule(rule) : defaultForm()));
   const [error, setError] = useState<string | null>(null);
-  const [hostFilter, setHostFilter] = useState("");
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((previous) => ({ ...previous, [key]: value }));
   const scoped = SCOPED_RULE_TYPES.includes(form.type);
   const forDuration = FOR_DURATION_RULE_TYPES.includes(form.type);
   const hostNames = useMemo(() => new Map(proxyHosts.map((host) => [host.id, host.name])), [proxyHosts]);
-  const filteredHosts = useMemo(() => {
-    const needle = hostFilter.trim().toLowerCase();
-    return needle ? proxyHosts.filter((host) => host.name.toLowerCase().includes(needle)) : proxyHosts;
-  }, [proxyHosts, hostFilter]);
 
   function changeType(type: RuleType) {
     setForm((previous) => ({ ...defaultForm(type), name: previous.name, channelIds: previous.channelIds, enabled: previous.enabled }));
@@ -195,12 +190,6 @@ export default function RuleEditor({ open, rule, onClose, channels, proxyHosts, 
     }));
   }
 
-  function toggleHost(id: number, checked: boolean) {
-    setForm((previous) => ({
-      ...previous,
-      proxyHostIds: checked ? [...new Set([...previous.proxyHostIds, id])] : previous.proxyHostIds.filter((existing) => existing !== id),
-    }));
-  }
 
   function save() {
     setError(null);
@@ -323,34 +312,19 @@ export default function RuleEditor({ open, rule, onClose, channels, proxyHosts, 
             />
             {form.scope === "hosts" && (
               <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 rounded-lg border border-line bg-panel px-2.5 focus-within:border-brand">
-                  <Search aria-hidden="true" className="h-4 w-4 shrink-0 text-soft" />
-                  <Input
-                    type="search"
-                    aria-label="Filter proxy hosts"
-                    placeholder="Filter proxy hosts"
-                    value={hostFilter}
-                    onChange={(event) => setHostFilter(event.target.value)}
-                    className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
-                  />
-                </div>
                 {proxyHosts.length === 0 ? (
                   <p className="text-[13px] text-muted-foreground">There are no proxy hosts yet.</p>
                 ) : (
-                  <div className="max-h-52 overflow-y-auto rounded-lg border border-line bg-background p-1.5" role="group" aria-label="Proxy hosts">
-                    {filteredHosts.length === 0 && <p className="px-2 py-1.5 text-[13px] text-muted-foreground">No proxy host matches.</p>}
-                    {filteredHosts.map((host) => (
-                      <label key={host.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-panel2">
-                        <Checkbox checked={form.proxyHostIds.includes(host.id)} onCheckedChange={(checked) => toggleHost(host.id, checked === true)} />
-                        <span className="num min-w-0 truncate">{host.name}</span>
-                      </label>
-                    ))}
-                  </div>
+                  <HostMultiPicker
+                    hosts={proxyHosts}
+                    value={form.proxyHostIds}
+                    max={MAX_SCOPE_HOSTS}
+                    onChange={(proxyHostIds) => setForm((previous) => ({ ...previous, proxyHostIds }))}
+                  />
                 )}
-                <p className="text-xs text-muted-foreground">
-                  <span className="num">{form.proxyHostIds.length}</span> chosen, up to <span className="num">{MAX_SCOPE_HOSTS}</span>
-                  {form.proxyHostIds.some((id) => !hostNames.has(id)) ? ". Some chosen hosts are not listed: they were deleted or are outside your scope." : "."}
-                </p>
+                {form.proxyHostIds.some((id) => !hostNames.has(id)) && (
+                  <p className="m-0 text-xs text-muted-foreground">Some chosen hosts are not listed: they were deleted or are outside your scope.</p>
+                )}
               </div>
             )}
             {SCOPE_HINTS[form.type] && <p className="text-xs text-muted-foreground">{SCOPE_HINTS[form.type]}</p>}

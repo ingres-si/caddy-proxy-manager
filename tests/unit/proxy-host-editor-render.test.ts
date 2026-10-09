@@ -202,14 +202,42 @@ describe('host editor sections', () => {
     // Geo blocking is part of Security.
     expect(html).toContain('Geo blocking');
     // Global mode names the mode the WAF settings give it today.
-    expect(html).toContain('Currently blocking.');
+    expect(html).toContain('Follows the WAF settings: blocking now.');
+    // The rarely changed settings sit under Advanced, closed while they are the defaults.
+    expect(html).toMatch(/aria-expanded="false" aria-controls="waf-advanced"/);
+    expect(html).toContain('<div id="waf-advanced" hidden=""');
+    // Every exclusion with where it applies; changing them needs waf:write.
     expect(html).toContain('Restricted SQL Character Anomaly Detection (args)');
-    expect(html).toContain('aria-label="Remove exclusion of rule 942430"');
-    expect(html).toContain('paths under /upload');
+    expect(html).toContain('Every request');
+    expect(html).toContain('Paths under /upload');
+    expect(html).not.toContain('Edit in WAF settings');
+    expect(html).not.toContain('aria-label="Remove the exclusion of rule 942430"');
     expect(html).toContain('Rate limiting');
-    // Rate limiting off still applies the global defaults: the card says so when there are any.
-    expect(html).not.toContain('global default rules apply');
-    expect(inEditor(createElement(SecuritySection), data({ rateLimitDefaults: { enabled: true, rules: 2 } }))).toContain('Off: the 2 global default rules apply.');
+    expect(html).toContain('No global rules are set, so nothing is limited.');
+    expect(inEditor(createElement(SecuritySection), data({ rateLimitDefaults: { enabled: true, rules: 2 } }))).toContain('The 2 global rules apply; this host adds none.');
+  });
+
+  it('Security: writers change and remove exclusions in place, and exclude the rules that matched lately', () => {
+    const html = inEditor(
+      createElement(SecuritySection),
+      data({ canWriteWaf: true, wafRecentRules: [{ ruleId: 941100, message: 'XSS Attack Detected via libinjection', events: 12, blocked: 3, topPath: '/search' }, { ruleId: 942430, message: null, events: 4, blocked: 0, topPath: null }] })
+    );
+    expect(html).toContain('Add exclusion');
+    expect(html).toContain('aria-label="Change the exclusion of rule 942430"');
+    expect(html).toContain('aria-label="Remove the exclusion of rule 942430"');
+    expect(html).toContain('Matched this host in the last 7 days');
+    expect(html).toContain('XSS Attack Detected via libinjection');
+    expect(html).toContain('12 matches, 3 blocked · mostly /search');
+    expect(html).toContain('aria-label="Exclude rule 941100"');
+    // Rules already excluded on every request are not offered again.
+    expect(html).not.toContain('aria-label="Exclude rule 942430"');
+  });
+
+  it('Security: Advanced opens by itself when something in it is not the default', () => {
+    const host = data().host!;
+    const html = inEditor(createElement(SecuritySection), data({ host: { ...host, waf: { ...host.waf!, waf_mode: 'override' } } as never }));
+    expect(html).toMatch(/aria-expanded="true" aria-controls="waf-advanced"/);
+    expect(html).toContain('own settings only');
   });
 
   it('Access: access list, geo blocking, sign-in, mTLS and blocked paths', () => {
