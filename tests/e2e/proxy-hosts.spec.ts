@@ -279,7 +279,8 @@ test.describe('Proxy Hosts', () => {
     const origin = new URL(page.url()).origin;
     const resp = await page.request.post(API_PROXY_HOSTS, {
       headers: { Origin: origin },
-      data: { name: 'Detail Page Host', domains: ['detail-page.local', 'www.detail-page.local'], upstreams: ['http://localhost:9779'] },
+      // Two upstreams: with one, the page does not offer health checks (they would only refuse requests).
+      data: { name: 'Detail Page Host', domains: ['detail-page.local', 'www.detail-page.local'], upstreams: ['http://localhost:9779', 'http://localhost:9780'] },
     });
     expect(resp.ok()).toBeTruthy();
     const created = (await resp.json()) as { id: number };

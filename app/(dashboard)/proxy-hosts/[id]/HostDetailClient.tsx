@@ -117,7 +117,9 @@ function HealthChecks({ health, upstreams, canWrite }: { health: ProxyHostHealth
     return (
       <div className="flex flex-col gap-1 rounded-[10px] bg-panel2 px-3 py-2.5 text-[13px]">
         <span className="font-semibold">Health checks are off</span>
-        {canWrite && (
+        {upstreams === 1 ? (
+          <span className="text-muted-foreground">With one upstream there is no other to send requests to, so a health check would only refuse requests while it fails.</span>
+        ) : canWrite && (
           <a href={`#${HEALTH_CHECKS_TARGET}`} className="mt-0.5 self-start text-brand underline-offset-4 hover:underline">
             Turn on health checks
           </a>
@@ -140,11 +142,24 @@ function HealthChecks({ health, upstreams, canWrite }: { health: ProxyHostHealth
     );
   }
   if (loadBalancing && upstreams > 1) lines.push(`Load balancing: ${loadBalancing.policy.replace(/_/g, " ")}.`);
+  // One upstream: taking it out of rotation leaves nothing to answer, so Caddy refuses every request (503) meanwhile.
+  const lonePassive = passive?.counting && upstreams === 1;
   return (
     <ul className="flex flex-col gap-1 rounded-[10px] bg-panel2 px-3 py-2.5 text-[13px] text-muted-foreground">
       {lines.map((line) => (
         <li key={line}>{line}</li>
       ))}
+      {lonePassive && (
+        <li className="text-warn">
+          With one upstream, {(passive.maxFails ?? 1) > 1 ? `${passive.maxFails} failed requests make` : "a single failed request makes"} Caddy refuse every request for{" "}
+          {passive.failDuration}.{" "}
+          {canWrite && (
+            <a href="#load-balancing" className="text-brand underline-offset-4 hover:underline">
+              Change it
+            </a>
+          )}
+        </li>
+      )}
     </ul>
   );
 }

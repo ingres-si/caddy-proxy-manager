@@ -181,6 +181,9 @@ describe('the web image and the example', () => {
     const entrypoint = readFileSync(join(ROOT, 'docker/web/entrypoint.sh'), 'utf8');
     expect(entrypoint).toContain('exec bun /app/ha/supervisor.js');
     expect(entrypoint).toContain('exec env HOSTNAME=0.0.0.0 bun server.js');
+    // Set before either start, so the supervisor's application inherits it.
+    expect(entrypoint.indexOf('export KEEP_ALIVE_TIMEOUT="${KEEP_ALIVE_TIMEOUT:-125000}"')).toBeGreaterThan(-1);
+    expect(entrypoint.indexOf('export KEEP_ALIVE_TIMEOUT')).toBeLessThan(entrypoint.indexOf('exec bun /app/ha/supervisor.js'));
   });
 
   it('keeps high availability out of the default and test stacks', () => {

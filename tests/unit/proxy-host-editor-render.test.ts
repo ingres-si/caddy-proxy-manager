@@ -181,6 +181,19 @@ describe('host editor sections', () => {
     expect(html).not.toContain('<label for="f-name"');
   });
 
+  it('Routing: warns that passive health checks on a lone upstream refuse every request after a failure', () => {
+    const lb = {
+      enabled: true, policy: 'random', policyHeaderField: null, policyCookieName: null, policyCookieSecret: null, tryDuration: null, tryInterval: null, retries: null,
+      activeHealthCheck: null, passiveHealthCheck: { enabled: true, failDuration: '30s', maxFails: null, unhealthyStatus: null, unhealthyLatency: null },
+    };
+    const lone = data({ host: { ...data().host!, loadBalancer: lb as never } });
+    const html = inEditor(createElement(RoutingSection), lone);
+    expect(html).toContain('One upstream with passive health checks:');
+    expect(html).toContain('Caddy refuses every request to this host (503) for 30s');
+    const two = data({ host: { ...data().host!, upstreams: ['http://10.0.0.5:8080', 'http://10.0.0.6:8080'], loadBalancer: lb as never } });
+    expect(inEditor(createElement(RoutingSection), two)).not.toContain('One upstream with passive health checks');
+  });
+
   it('Security: the WAF mode, the host’s exclusions and rate limiting', () => {
     const html = inEditor(createElement(SecuritySection));
     // The mode is a radio group of cards, like the WAF settings' global mode; the host blocks.

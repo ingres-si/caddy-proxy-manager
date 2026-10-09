@@ -252,14 +252,30 @@ describe('host page', () => {
 
   it('shows traffic, upstreams, paths, configuration and changes', () => {
     const html = renderDetail();
-    for (const text of ['Last 24 hours', '2,729', '60.7 MB', 'Alert at', 'Upstreams', 'https://mailcow-nginx:443', 'TLS to upstream', 'Health checks are off', 'Turn on health checks', 'Where requests go', '143 × 501', 'closed by the client', 'Configuration', 'Edit routing']) {
+    for (const text of ['Last 24 hours', '2,729', '60.7 MB', 'Alert at', 'Upstreams', 'https://mailcow-nginx:443', 'TLS to upstream', 'Health checks are off', 'Where requests go', '143 × 501', 'closed by the client', 'Configuration', 'Edit routing']) {
       expect(html, text).toContain(text);
     }
-    // Editing a section and turning on health checks stay on this page.
+    // Editing a section stays on this page.
     expect(html).toContain('href="#routing"');
-    expect(html).toContain('href="#health-checks"');
     // The changes are on the History tab, not the overview.
     expect(html).not.toContain('Changes to this host');
+  });
+
+  it('offers health checks only with more than one upstream, and warns about passive ones on a lone upstream', () => {
+    const lone = renderDetail();
+    expect(lone).toContain('With one upstream there is no other to send requests to');
+    expect(lone).not.toContain('Turn on health checks');
+
+    const second = { upstream: 'https://mailcow-nginx-2:443', dial: 'mailcow-nginx-2:443', tls: true, status: 'unchecked' as const, reported: true, fails: 0, requestsInFlight: 0 };
+    const two = renderDetail({ health: { ...detail.health, upstreams: [...detail.health.upstreams, second] } });
+    expect(two).toContain('Turn on health checks');
+    expect(two).toContain('href="#health-checks"');
+
+    const passive = renderDetail({
+      health: { ...detail.health, healthChecks: { active: null, passive: { counting: true, failDuration: '30s', maxFails: null }, loadBalancing: null } } as HostDetail['health'],
+    });
+    expect(passive).toContain('With one upstream, a single failed request makes Caddy refuse every request for 30s.');
+    expect(passive).toContain('href="#load-balancing"');
   });
 
   it('leaves out what the reader may not use', () => {

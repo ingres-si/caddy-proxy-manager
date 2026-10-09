@@ -216,6 +216,14 @@ export function RoutingSection() {
           </span>
         }
       >
+        {form.lb.enabled && serializeUpstreams(form.upstreams).length === 1 && form.lb.passive.enabled && (
+          <p role="note" className="m-0 rounded-[10px] border border-warn/40 bg-warn-tint px-3 py-2.5 text-[13px]">
+            <span className="font-semibold">One upstream with passive health checks:</span>{" "}
+            {Number(form.lb.passive.maxFails) > 1 ? `${form.lb.passive.maxFails} failed requests take` : "a single failed request takes"} it out of rotation, and
+            with no other upstream Caddy refuses every request to this host (503) for {form.lb.passive.failDuration || "the fail duration"}. Turn
+            passive health checks off, or add another upstream.
+          </p>
+        )}
         {form.lb.enabled && <LbFields lb={form.lb} onChange={(lb) => update((f) => ({ ...f, lb }))} idPrefix="f-lb" />}
       </EditorCard>
 
