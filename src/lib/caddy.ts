@@ -83,6 +83,7 @@ import {
   l4ProxyHosts
 } from "./db/schema";
 import { type GeoBlockMode, type WafHostConfig, type MtlsConfig, type RedirectRule, type RewriteConfig, type LocationRuleMeta, type PathAllowRule, type PathBlockRule, type PathRewriteRule, type ErrorPageRule } from "./models/proxy-hosts";
+import { stripPlaceholders } from "./caddy-placeholders";
 import { buildClientAuthentication, groupMtlsDomainsByCaSet, buildMtlsRbacSubroutes, buildFingerprintCelExpression, buildValidClientCertCelExpression, resolveAllowedFingerprints, type MtlsAccessRuleLike } from "./caddy-mtls";
 import { buildRoleFingerprintMap, buildCertFingerprintMap, buildRoleCertIdMap } from "./models/mtls-roles";
 import { getAccessRulesForHosts } from "./models/mtls-access-rules";
@@ -1169,7 +1170,7 @@ export function buildLocationReverseProxy(
   const hasHttps = parsedTargets.some((t) => t.scheme === "https");
 
   // Sanitize path to prevent Caddy placeholder injection
-  const safePath = rule.path.replace(/\{[^}]*\}/g, "");
+  const safePath = stripPlaceholders(rule.path);
 
   const reverseProxyHandler: Record<string, unknown> = {
     handler: "reverse_proxy",
@@ -1389,12 +1390,12 @@ async function buildProxyRoutes(
     const pathRewrites = meta.path_rewrites ?? [];
     if (pathBlocks.length > 0 || pathRewrites.length > 0) {
       const allowPatterns = pathAllows
-        .map((a) => a.path.replace(/\{[^}]*\}/g, ''))
+        .map((a) => stripPlaceholders(a.path))
         .filter((p) => p.length > 0);
       const pathRoutes: CaddyHttpRoute[] = [];
       for (const block of pathBlocks) {
         // Sanitize path to prevent Caddy placeholder injection
-        const safePath = block.path.replace(/\{[^}]*\}/g, '');
+        const safePath = stripPlaceholders(block.path);
         if (!safePath) continue;
         const handle: Record<string, unknown> = {
           handler: "static_response",
@@ -1414,8 +1415,8 @@ async function buildProxyRoutes(
         });
       }
       for (const rw of pathRewrites) {
-        const safeFrom = rw.from.replace(/\{[^}]*\}/g, '');
-        const safeTo = rw.to.replace(/\{[^}]*\}/g, '');
+        const safeFrom = stripPlaceholders(rw.from);
+        const safeTo = stripPlaceholders(rw.to);
         if (!safeFrom || !safeTo) continue;
         pathRoutes.push({
           match: [{ path: [safeFrom] }],
@@ -1527,7 +1528,7 @@ async function buildProxyRoutes(
         match: [
           {
             // Sanitize outpostDomain to prevent path traversal and placeholder injection
-            path: [`/${authentik.outpostDomain.replace(/\.\./g, '').replace(/\{[^}]*\}/g, '').replace(/\/+/g, '/')}/*`]
+            path: [`/${stripPlaceholders(authentik.outpostDomain.replace(/\.\./g, '')).replace(/\/+/g, '/')}/*`]
           }
         ],
         handle: [...earlyRateLimit, outpostHandler],
@@ -1610,7 +1611,7 @@ async function buildProxyRoutes(
     // Structured path prefix rewrite
     // Sanitize path_prefix to prevent Caddy placeholder injection
     if (meta.rewrite?.path_prefix) {
-      const safePrefix = meta.rewrite.path_prefix.replace(/\{[^}]*\}/g, '');
+      const safePrefix = stripPlaceholders(meta.rewrite.path_prefix);
       if (safePrefix) {
         handlers.push({
           handler: "rewrite",
@@ -3897,8 +3898,7 @@ function parseForwardAuthConfig(meta: ForwardAuthMeta | undefined | null): Forwa
   }
 
   const provider = meta.provider === "custom" ? "custom" : "authelia";
-  const endpointRaw = (typeof meta.auth_endpoint === "string" ? meta.auth_endpoint.trim() : "")
-    .replace(/\{[^}]*\}/g, ""); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+  const endpointRaw = stripPlaceholders(typeof meta.auth_endpoint === "string" ? meta.auth_endpoint.trim() : "");
   const authEndpoint = endpointRaw || (provider === "authelia" ? DEFAULT_AUTHELIA_FORWARD_AUTH_ENDPOINT : "");
   const hasControlChar = /[\r\n]/.test(authEndpoint) || authEndpoint.includes("\u0000");
   if (!authEndpoint.startsWith("/") || hasControlChar) {
@@ -3928,7 +3928,7 @@ function parseForwardAuthConfig(meta: ForwardAuthMeta | undefined | null): Forwa
   const sanitizePaths = (paths: unknown): string[] | null =>
     Array.isArray(paths) && paths.length > 0
       ? paths
-          .map((p) => (typeof p === "string" ? p.trim().replace(/\{[^}]*\}/g, "") : ""))
+          .map((p) => (typeof p === "string" ? stripPlaceholders(p.trim()) : ""))
           .filter((p): p is string => Boolean(p))
       : null;
 

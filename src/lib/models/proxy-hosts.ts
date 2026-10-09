@@ -1,5 +1,6 @@
 import { appDb, nowIso, toIso } from "../db";
 import { applyCaddyConfig } from "../caddy";
+import { stripPlaceholders } from "../caddy-placeholders";
 import { CaddyApplyError } from "../caddy-apply-error";
 import { logAuditEvent } from "../audit";
 import {
@@ -453,14 +454,14 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
   }
 
   if (Array.isArray(meta.protected_paths)) {
-    const paths = meta.protected_paths.map((path) => path?.trim().replace(/\{[^}]*\}/g, "")).filter((path): path is string => Boolean(path)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    const paths = meta.protected_paths.map((path) => (path ? stripPlaceholders(path.trim()) : "")).filter((path): path is string => Boolean(path));
     if (paths.length > 0) {
       normalized.protected_paths = paths;
     }
   }
 
   if (Array.isArray(meta.excluded_paths)) {
-    const paths = meta.excluded_paths.map((path) => path?.trim().replace(/\{[^}]*\}/g, "")).filter((path): path is string => Boolean(path)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    const paths = meta.excluded_paths.map((path) => (path ? stripPlaceholders(path.trim()) : "")).filter((path): path is string => Boolean(path));
     if (paths.length > 0) {
       normalized.excluded_paths = paths;
     }
@@ -712,7 +713,7 @@ function sanitizeAuthentikMeta(meta: ProxyHostAuthentikMeta | undefined): ProxyH
 
   const authEndpoint = normalizeMetaValue(meta.auth_endpoint ?? null);
   if (authEndpoint) {
-    normalized.auth_endpoint = authEndpoint.replace(/\{[^}]*\}/g, ""); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    normalized.auth_endpoint = stripPlaceholders(authEndpoint);
   }
 
   if (Array.isArray(meta.copy_headers)) {
@@ -734,14 +735,14 @@ function sanitizeAuthentikMeta(meta: ProxyHostAuthentikMeta | undefined): ProxyH
   }
 
   if (Array.isArray(meta.protected_paths)) {
-    const paths = meta.protected_paths.map((path) => path?.trim().replace(/\{[^}]*\}/g, "")).filter((path): path is string => Boolean(path));
+    const paths = meta.protected_paths.map((path) => (path ? stripPlaceholders(path.trim()) : "")).filter((path): path is string => Boolean(path));
     if (paths.length > 0) {
       normalized.protected_paths = paths;
     }
   }
 
   if (Array.isArray(meta.excluded_paths)) {
-    const paths = meta.excluded_paths.map((path) => path?.trim().replace(/\{[^}]*\}/g, "")).filter((path): path is string => Boolean(path));
+    const paths = meta.excluded_paths.map((path) => (path ? stripPlaceholders(path.trim()) : "")).filter((path): path is string => Boolean(path));
     if (paths.length > 0) {
       normalized.excluded_paths = paths;
     }
@@ -772,7 +773,7 @@ function sanitizeForwardAuthMeta(meta: ForwardAuthMeta | undefined): ForwardAuth
   }
   const endpoint = normalizeMetaValue(meta.auth_endpoint ?? null);
   if (endpoint) {
-    normalized.auth_endpoint = endpoint.replace(/\{[^}]*\}/g, ""); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    normalized.auth_endpoint = stripPlaceholders(endpoint);
   }
   if (Array.isArray(meta.copy_headers)) {
     const headers = meta.copy_headers
@@ -800,13 +801,13 @@ function sanitizeForwardAuthMeta(meta: ForwardAuthMeta | undefined): ForwardAuth
     }
   }
   if (Array.isArray(meta.protected_paths)) {
-    const paths = meta.protected_paths.map((p) => p?.trim().replace(/\{[^}]*\}/g, "")).filter((p): p is string => Boolean(p)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    const paths = meta.protected_paths.map((p) => (p ? stripPlaceholders(p.trim()) : "")).filter((p): p is string => Boolean(p));
     if (paths.length > 0) {
       normalized.protected_paths = paths;
     }
   }
   if (Array.isArray(meta.excluded_paths)) {
-    const paths = meta.excluded_paths.map((p) => p?.trim().replace(/\{[^}]*\}/g, "")).filter((p): p is string => Boolean(p)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    const paths = meta.excluded_paths.map((p) => (p ? stripPlaceholders(p.trim()) : "")).filter((p): p is string => Boolean(p));
     if (paths.length > 0) {
       normalized.excluded_paths = paths;
     }
@@ -985,13 +986,13 @@ function sanitizeIngressiForwardAuthMeta(meta: IngressiForwardAuthMeta | undefin
     normalized.enabled = Boolean(meta.enabled);
   }
   if (Array.isArray(meta.protected_paths)) {
-    const paths = meta.protected_paths.map((p) => p?.trim().replace(/\{[^}]*\}/g, "")).filter((p): p is string => Boolean(p)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    const paths = meta.protected_paths.map((p) => (p ? stripPlaceholders(p.trim()) : "")).filter((p): p is string => Boolean(p));
     if (paths.length > 0) {
       normalized.protected_paths = paths;
     }
   }
   if (Array.isArray(meta.excluded_paths)) {
-    const paths = meta.excluded_paths.map((p) => p?.trim().replace(/\{[^}]*\}/g, "")).filter((p): p is string => Boolean(p)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    const paths = meta.excluded_paths.map((p) => (p ? stripPlaceholders(p.trim()) : "")).filter((p): p is string => Boolean(p));
     if (paths.length > 0) {
       normalized.excluded_paths = paths;
     }
@@ -1115,8 +1116,7 @@ function sanitizeRedirectRules(value: unknown): RedirectRule[] {
       typeof item.to === "string" && item.to.trim() &&
       [301, 302, 307, 308].includes(item.status)
     ) {
-      // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
-      valid.push({ from: item.from.trim().replace(/\{[^}]*\}/g, ""), to: item.to.trim().replace(/\{[^}]*\}/g, ""), status: item.status });
+      valid.push({ from: stripPlaceholders(item.from.trim()), to: stripPlaceholders(item.to.trim()), status: item.status });
     }
   }
   return valid;
@@ -1135,8 +1135,7 @@ function sanitizePathAllows(value: unknown): PathAllowRule[] {
   const valid: PathAllowRule[] = [];
   for (const item of value) {
     if (item && typeof item === "object" && typeof item.path === "string" && item.path.trim()) {
-      // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
-      const path = item.path.trim().replace(/\{[^}]*\}/g, "");
+      const path = stripPlaceholders(item.path.trim());
       if (path) {
         valid.push({ path });
       }
@@ -1157,8 +1156,7 @@ function sanitizePathBlocks(value: unknown): PathBlockRule[] {
       (PATH_BLOCK_STATUS_CODES as readonly number[]).includes(item.status)
     ) {
       const rule: PathBlockRule = {
-        // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
-        path: item.path.trim().replace(/\{[^}]*\}/g, ""),
+        path: stripPlaceholders(item.path.trim()),
         status: item.status as PathBlockStatusCode,
       };
       if (typeof item.body === "string" && item.body.length > 0) {
@@ -1182,10 +1180,8 @@ function sanitizePathRewrites(value: unknown): PathRewriteRule[] {
       typeof item.from === "string" && item.from.trim() &&
       typeof item.to === "string" && item.to.trim()
     ) {
-      // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
-      const from = item.from.trim().replace(/\{[^}]*\}/g, "");
-      // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
-      const to = item.to.trim().replace(/\{[^}]*\}/g, "");
+      const from = stripPlaceholders(item.from.trim());
+      const to = stripPlaceholders(item.to.trim());
       if (from && to) {
         valid.push({ from, to });
       }
@@ -1462,7 +1458,7 @@ function normalizeForwardAuthInput(
   if (input.authEndpoint !== undefined) {
     const endpoint = normalizeMetaValue(input.authEndpoint ?? null);
     if (endpoint) {
-      next.auth_endpoint = endpoint.replace(/\{[^}]*\}/g, ""); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+      next.auth_endpoint = stripPlaceholders(endpoint);
     } else {
       delete next.auth_endpoint;
     }
