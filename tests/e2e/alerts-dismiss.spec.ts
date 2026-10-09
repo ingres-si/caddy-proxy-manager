@@ -2,7 +2,7 @@
  * Dismissing an open alert on the E2E stack: a certificate-expiry rule that
  * notifies an e-mail channel fires for an imported certificate that expires
  * in two days (the built-in certificate rule is disabled meanwhile, so only
- * this rule reports it). Dismissed from the Open tab, the alert stays listed,
+ * this rule reports it). Dismissed from the Open tab (at once, until it resolves), the alert stays listed,
  * marked, and leaves the overview's Needs attention and the sidebar count;
  * Undo brings it back. Dismissed from Needs attention, the same, with Undo
  * right there.
@@ -101,22 +101,16 @@ test.describe('Dismissing an alert', () => {
       const before = await sidebarCount(page);
       expect(before).toBeGreaterThanOrEqual(1);
 
-      // Dismiss it until it resolves, with a note.
+      // Dismiss dismisses: until it resolves, at once, no dialog.
       await page.goto('/alerts');
       const card = page.getByRole('article').filter({ hasText: ruleName });
       await card.getByRole('button', { name: `Dismiss ${alert.title}` }).click();
-      const dialog = page.getByRole('dialog');
-      await expect(dialog.getByRole('heading', { name: 'Dismiss alert' })).toBeVisible();
-      await expect(dialog.getByRole('radio', { name: 'Until it resolves' })).toBeChecked();
-      await dialog.getByLabel('Note (optional)').fill('Renewal ordered');
-      await dialog.getByRole('button', { name: 'Dismiss', exact: true }).click();
-      await expect(dialog).toBeHidden();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
 
       const marker = card.getByTestId('silence-marker');
       await expect(marker).toContainText('Dismissed');
-      await expect(marker).toContainText('Renewal ordered');
       const dismissed = (await ours())!;
-      expect(dismissed.dismissal).toMatchObject({ note: 'Renewal ordered', until: null });
+      expect(dismissed.dismissal).toMatchObject({ until: null });
       if (dismissed.dismissal!.createdByName) await expect(marker).toContainText(`Dismissed · ${dismissed.dismissal!.createdByName}`);
 
       await page.goto('/');
@@ -128,6 +122,15 @@ test.describe('Dismissing an alert', () => {
       await page.goto('/alerts');
       await card.getByRole('button', { name: `Undo the dismissal of ${alert.title}` }).click();
       await expect(card.getByTestId('silence-marker')).toHaveCount(0);
+      expect((await ours())!.dismissal).toBeNull();
+
+      // A dismissal for a while, or muting the rule, is in the menu next to Dismiss.
+      await card.getByRole('button', { name: `More ways to dismiss ${alert.title}` }).click();
+      await page.getByRole('menuitem', { name: 'Dismiss for a while…' }).click();
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByRole('heading', { name: 'Dismiss alert' })).toBeVisible();
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      await expect(dialog).toBeHidden();
       expect((await ours())!.dismissal).toBeNull();
 
       await page.goto('/');

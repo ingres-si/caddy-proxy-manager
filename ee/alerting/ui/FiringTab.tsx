@@ -3,8 +3,9 @@
 
 import Link from "next/link";
 import { Fragment, useMemo, useState } from "react";
-import { BellOff, BellRing, ChevronRight, Info, OctagonAlert, TriangleAlert, type LucideIcon } from "lucide-react";
+import { BellOff, BellRing, ChevronDown, ChevronRight, Info, OctagonAlert, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -33,8 +34,12 @@ type Props = {
   onEditRule: (rule: AlertRuleView) => void;
   /** alerts:write: edit rules, dismiss alerts, undo dismissals and mutes. */
   canWrite?: boolean;
-  /** Opens the dismiss dialog (offered with canWrite). */
+  /** Dismisses the alert until it resolves, at once (offered with canWrite). */
   onDismiss?: (alert: FiringAlertView) => void;
+  /** Opens the dialog for a dismissal for a while or a mute of the rule. */
+  onDismissOptions?: (alert: FiringAlertView, kind: "dismiss" | "mute") => void;
+  /** The alert being dismissed, as rule:subject, while the dismissal is on its way. */
+  dismissing?: string | null;
   /** Opens the editor for a new rule (offered with canWrite when every rule is disabled). */
   onCreateRule?: () => void;
 };
@@ -59,7 +64,7 @@ function clearsText(alert: FiringAlertView): string {
   return "No resolve notice; a PagerDuty incident is still closed";
 }
 
-function FiringCard({ alert, rule, hostNames, now, canEdit, canWrite, onEditRule, onDismiss }: {
+function FiringCard({ alert, rule, hostNames, now, canEdit, canWrite, onEditRule, onDismiss, onDismissOptions, dismissing }: {
   alert: FiringAlertView;
   rule: AlertRuleView | undefined;
   hostNames: ReadonlyMap<number, string>;
@@ -68,6 +73,8 @@ function FiringCard({ alert, rule, hostNames, now, canEdit, canWrite, onEditRule
   canWrite: boolean;
   onEditRule: (rule: AlertRuleView) => void;
   onDismiss?: (alert: FiringAlertView) => void;
+  onDismissOptions?: (alert: FiringAlertView, kind: "dismiss" | "mute") => void;
+  dismissing?: string | null;
 }) {
   const format = useFormat();
   const undo = useEndSilence();
@@ -121,9 +128,32 @@ function FiringCard({ alert, rule, hostNames, now, canEdit, canWrite, onEditRule
             </Button>
           )}
           {canEdit && onDismiss && !alert.dismissal && (
-            <Button variant="secondary" size="sm" onClick={() => onDismiss(alert)} aria-label={`Dismiss ${alert.title}`}>
-              Dismiss
-            </Button>
+            <span className="flex">
+              <Button
+                variant="secondary"
+                size="sm"
+                className={cn(onDismissOptions && "rounded-r-none")}
+                disabled={dismissing === `${alert.ruleId}:${alert.subjectKey}`}
+                onClick={() => onDismiss(alert)}
+                aria-label={`Dismiss ${alert.title}`}
+                title="Dismiss until it resolves, for everyone"
+              >
+                Dismiss
+              </Button>
+              {onDismissOptions && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="secondary" size="sm" className="rounded-l-none border-l border-line2 px-1.5" aria-label={`More ways to dismiss ${alert.title}`}>
+                      <ChevronDown aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => onDismissOptions(alert, "dismiss")}>Dismiss for a while…</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => onDismissOptions(alert, "mute")}>Mute the rule…</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </span>
           )}
         </div>
       </div>
@@ -241,7 +271,7 @@ function EpisodeDetail({ episode, hostNames }: { episode: AlertEpisode; hostName
   );
 }
 
-export default function FiringTab({ firing, rules, hostNames, now, onEditRule, canWrite = false, onDismiss, onCreateRule }: Props) {
+export default function FiringTab({ firing, rules, hostNames, now, onEditRule, canWrite = false, onDismiss, onDismissOptions, dismissing = null, onCreateRule }: Props) {
   const format = useFormat();
   const ruleById = useMemo(() => new Map(rules.map((rule) => [rule.id, rule])), [rules]);
   const pending = rules.filter((rule) => rule.enabled).flatMap((rule) => rule.pending.map((item) => ({ rule, item })));
@@ -289,6 +319,8 @@ export default function FiringTab({ firing, rules, hostNames, now, onEditRule, c
             canWrite={canWrite}
             onEditRule={onEditRule}
             onDismiss={onDismiss}
+            onDismissOptions={onDismissOptions}
+            dismissing={dismissing}
           />
         ))
       )}

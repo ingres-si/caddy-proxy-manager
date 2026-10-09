@@ -3,7 +3,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { Banner } from "@/components/ui/Banner";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import ChannelsTab from "./ChannelsTab";
 import HistoryTab from "./HistoryTab";
 import RuleEditor, { type HostChoice } from "./RuleEditor";
 import { SilenceDialog, type SilenceTarget } from "./silence";
+import { silenceAlertAction } from "./actions";
 import { buildEpisodes } from "./format";
 import { TabCount } from "./parts";
 
@@ -98,6 +100,25 @@ export default function AlertsClient({
     setSilence((current) => ({ key: current.key + 1, open: true, target }));
   }
 
+  // Dismiss dismisses: until the alert resolves, for everyone, at once. The card then
+  // shows who dismissed it, with Undo; a time limit or a muted rule is in the menu next to it.
+  const [dismissing, setDismissing] = useState<string | null>(null);
+  const [, startDismiss] = useTransition();
+  function dismissNow(alert: FiringAlertView) {
+    const key = `${alert.ruleId}:${alert.subjectKey}`;
+    setDismissing(key);
+    startDismiss(async () => {
+      const result = await silenceAlertAction({ ruleId: alert.ruleId, subjectKey: alert.subjectKey }).catch(() => ({
+        ok: false as const,
+        error: "The server did not answer: the alert was not dismissed.",
+      }));
+      if (result.ok) toast.success("Dismissed for everyone until it resolves");
+      else toast.error(result.error);
+      router.refresh();
+      setDismissing(null);
+    });
+  }
+
   // Dismissed alerts and alerts of muted rules are listed, but do not need attention.
   const active = firing.filter((alert) => !alert.dismissal && !alert.mute).length;
   const enabledChannels = new Set(channels.filter((channel) => channel.enabled).map((channel) => channel.id));
@@ -159,7 +180,11 @@ export default function AlertsClient({
             now={now}
             onEditRule={(rule) => openEditor(rule)}
             canWrite={canWrite}
-            onDismiss={(alert) => openSilence({ kind: "dismiss", alert })}
+            onDismiss={dismissNow}
+            onDismissOptions={(alert, kind) =>
+              openSilence(kind === "mute" ? { kind: "mute", rule: { id: alert.ruleId, name: alert.ruleName } } : { kind: "dismiss", alert })
+            }
+            dismissing={dismissing}
             onCreateRule={() => openEditor(null)}
           />
         </TabsContent>

@@ -150,8 +150,11 @@ describe('Alerts page', () => {
     expect(html).toContain('Event log, last 90 days');
   });
 
-  it('offers Dismiss to writers', () => {
-    expect(render('firing')).toContain('aria-label="Dismiss Upstream 10.0.0.5:8080 is failing"');
+  it('offers Dismiss to writers, with a dismissal for a while and muting the rule in a menu next to it', () => {
+    const html = render('firing');
+    expect(html).toContain('aria-label="Dismiss Upstream 10.0.0.5:8080 is failing"');
+    expect(html).toContain('title="Dismiss until it resolves, for everyone"');
+    expect(html).toContain('aria-label="More ways to dismiss Upstream 10.0.0.5:8080 is failing"');
     // A reader: no Dismiss.
     expect(render('firing', { canWrite: false })).not.toContain('>Dismiss<');
   });
