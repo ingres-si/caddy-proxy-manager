@@ -40,7 +40,7 @@ Only structured, aggregated facts about the alert: its type and what the type me
 
 Some of those values can come from users, logs or requests (host names, WAF rule messages). They are sent as JSON inside a data block delimited by a tag with a random id, with `<` and `>` escaped so nothing inside can close it. The system prompt tells the model that the block is untrusted data, that it must never follow instructions, requests or links inside it, and to answer in 2 to 4 plain sentences. The model gets no tools.
 
-Anthropic requests use `messages.create` with `max_tokens: 1024` and `output_config: {effort: "low"}`. A response whose `stop_reason` is `refusal` yields no explanation; only `text` content blocks are used. OpenAI-compatible requests send the same system and user messages with `max_tokens: 1024`; a `content_filter` finish yields no explanation and `<think>` blocks are removed. The answer is reduced to plain text of at most 1200 characters.
+Anthropic requests use `messages.create` with `max_tokens: 1024` and `output_config: {effort: "low"}`. A response whose `stop_reason` is `refusal` yields no explanation; only `text` content blocks are used. OpenAI-compatible requests send the same system and user messages with `max_tokens: 4096`, room for a reasoning model's thinking as well as its answer; a `content_filter` finish yields no explanation, `<think>` blocks are removed, an answer given as content parts is read from its text parts, and a reply with only reasoning (no answer before the limit) says so. The answer is reduced to plain text of at most 1200 characters.
 
 ## Never in the way of an alert
 

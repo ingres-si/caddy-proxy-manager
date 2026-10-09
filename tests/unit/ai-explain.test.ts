@@ -216,13 +216,21 @@ describe('requestExplanation with an OpenAI-compatible server', () => {
     const body = JSON.parse(String(init!.body));
     expect(body).toEqual({
       model: 'llama3.1',
-      max_tokens: 1024,
+      // Room for a reasoning model's thinking as well as its answer.
+      max_tokens: 4096,
       messages: [
         { role: 'system', content: EXPLANATION_SYSTEM_PROMPT },
         { role: 'user', content: expect.stringContaining('<alert_data_') },
       ],
     });
     expect(sdk.create).not.toHaveBeenCalled();
+  });
+
+  it('reads an answer given as content parts', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      reply({ choices: [{ finish_reason: 'stop', message: { content: [{ type: 'text', text: 'Rule 942100 ' }, { type: 'image_url' }, { type: 'text', text: 'blocked them.' }] } }] })
+    );
+    expect(await requestExplanation(local, wafAlert)).toEqual({ ok: true, text: 'Rule 942100 blocked them.' });
   });
 
   it('sends no Authorization header without a key', async () => {
@@ -236,6 +244,16 @@ describe('requestExplanation with an OpenAI-compatible server', () => {
     ['an HTTP error', new Response('{"error":"key sk-123 invalid"}', { status: 401 }), 'The provider answered with HTTP 401'],
     ['a non-JSON answer', new Response('<html>', { status: 200 }), "The provider's answer was not JSON"],
     ['an answer without text', reply({ choices: [] }), "The provider's answer had no text"],
+    [
+      'a reasoning model that ran out of tokens before answering',
+      reply({ choices: [{ finish_reason: 'length', message: { content: null, reasoning_content: 'Let me think about the traffic…' } }] }),
+      'The model used up its output before answering, probably on reasoning. Use a model without reasoning, or one set to reason less.',
+    ],
+    [
+      'only reasoning, without a length stop',
+      reply({ choices: [{ finish_reason: 'stop', message: { content: '', reasoning_content: 'Thinking…' } }] }),
+      'The model used up its output before answering, probably on reasoning. Use a model without reasoning, or one set to reason less.',
+    ],
   ])('fails cleanly on %s', async (_label, response, error) => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(response);
     expect(await requestExplanation(local, wafAlert)).toEqual({ ok: false, error });

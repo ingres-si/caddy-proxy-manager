@@ -18,6 +18,13 @@ import { RULE_TYPE_DESCRIPTIONS, RULE_TYPE_LABELS, isRuleType, type Severity } f
 import { getAiProviderConfig, ANTHROPIC_API_URL, type ResolvedAiProvider } from "./settings";
 
 export const AI_MAX_TOKENS = 1024;
+/**
+ * Output tokens an OpenAI-compatible model may use. Higher than Anthropic's:
+ * these are often reasoning models (Qwen, DeepSeek, gpt-oss) whose thinking
+ * counts against the limit, and with 1024 they can spend all of it thinking
+ * and return no answer. Answers are cut to their maximum length anyway.
+ */
+export const OPENAI_COMPATIBLE_MAX_TOKENS = 4096;
 const MAX_EXPLANATION_CHARS = 1200;
 const MAX_RESPONSE_BYTES = 1024 * 1024;
 
@@ -152,6 +159,15 @@ export function providerHttpError(status: number): string {
   return `${message}. If a web application firewall protects the provider, it may have refused the prompt.`;
 }
 
+/** A chat message's text: a string, or the text parts of a list of content parts. */
+function messageText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) => (part && typeof part === "object" && (part as { type?: unknown }).type === "text" && typeof (part as { text?: unknown }).text === "string" ? (part as { text: string }).text : ""))
+    .join("");
+}
+
 async function callOpenAiCompatible(provider: ResolvedAiProvider, prompt: ModelPrompt, signal: AbortSignal): Promise<string> {
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: "POST",
@@ -161,7 +177,7 @@ async function callOpenAiCompatible(provider: ResolvedAiProvider, prompt: ModelP
     },
     body: JSON.stringify({
       model: provider.model,
-      max_tokens: AI_MAX_TOKENS,
+      max_tokens: OPENAI_COMPATIBLE_MAX_TOKENS,
       messages: [
         { role: "system", content: prompt.system },
         { role: "user", content: prompt.user },
@@ -180,10 +196,20 @@ async function callOpenAiCompatible(provider: ResolvedAiProvider, prompt: ModelP
   } catch {
     throw new ProviderError("The provider's answer was not JSON");
   }
-  const choice = (parsed as { choices?: { finish_reason?: unknown; message?: { content?: unknown } }[] })?.choices?.[0];
+  const choice = (parsed as { choices?: { finish_reason?: unknown; message?: { content?: unknown; reasoning_content?: unknown } }[] })?.choices?.[0];
   if (choice?.finish_reason === "content_filter") throw new RefusalError();
-  if (typeof choice?.message?.content !== "string") throw new ProviderError("The provider's answer had no text");
-  return choice.message.content;
+  const text = messageText(choice?.message?.content);
+  if (text.trim()) return text;
+  // Only reasoning came back: the model spent its output budget thinking.
+  if (choice?.finish_reason === "length" || typeof choice?.message?.reasoning_content === "string") {
+    throw new ProviderError(
+      "The model used up its output before answering, probably on reasoning. Use a model without reasoning, or one set to reason less."
+    );
+  }
+  // An empty answer is reported by the caller as "returned no text".
+  const content = choice?.message?.content;
+  if (typeof content === "string" || Array.isArray(content)) return text;
+  throw new ProviderError("The provider's answer had no text");
 }
 
 export type ModelTextOptions = {

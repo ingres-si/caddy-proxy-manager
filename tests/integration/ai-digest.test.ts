@@ -338,7 +338,7 @@ describe('digest preview and send', () => {
     expect(preview.text).toContain('AI-generated summary\nA quiet day. Nothing needs attention.');
     expect(preview.text).not.toContain('hidden');
     expect(sent).not.toHaveProperty('tools');
-    expect(sent.max_tokens).toBe(1024);
+    expect(sent.max_tokens).toBe(4096);
     expect(sent.messages[0]).toEqual({ role: 'system', content: DIGEST_SYSTEM_PROMPT });
     expect(sent.messages[1].content).toMatch(/<digest_data_[0-9a-f]{16}>/);
   });
