@@ -852,7 +852,7 @@ class FileRewriter {
     const symbol = this.checker.getSymbolAtLocation(name);
     if (!symbol) return false;
     // Replacement text that names it again (sql<T>`${…}`) keeps it.
-    const word = new RegExp(`(^|[^\\w$])${name.text.replace(/\$/g, "\\$")}([^\\w$]|$)`);
+    const word = new RegExp(`(^|[^\\w$])${name.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\w$]|$)`);
     if (this.edits.some((edit) => edit.end > edit.start && word.test(edit.text))) return false;
     let total = 0;
     let removed = 0;

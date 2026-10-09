@@ -43,7 +43,7 @@ export async function saveProxyHostEditorAction(id: number | null, payload: unkn
         message: `Saved, but not live yet: ${error.message}. Caddy keeps serving its previous configuration until an apply succeeds.`,
       };
     }
-    console.error(`Failed to save proxy host ${id ?? "(new)"}:`, error);
+    console.error("Failed to save proxy host:", id ?? "(new)", error);
     return { status: "error", message: errorMessage(error, "The proxy host could not be saved. Check the logs for details.") };
   }
 }
