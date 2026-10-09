@@ -21,6 +21,8 @@ cp .env.example .env
 docker compose up -d
 ```
 
+`SESSION_SECRET` needs at least 32 characters. `ADMIN_PASSWORD` needs at least 12, with upper- and lowercase letters, a number and a special character. With other values the web container stops at start-up and restarts; `docker compose logs web` says which value to change, and `docker compose up -d --force-recreate web` applies the corrected `.env`.
+
 Sign in at `http://localhost:3000/login` with `ADMIN_USERNAME` (`admin` in `.env.example`) and `ADMIN_PASSWORD`.
 
 Data persists in Docker volumes (caddy-manager-data, caddy-data, caddy-config, caddy-logs, geoip-data, clickhouse-data, acme-ca). The environment variables are listed in the [configuration reference](documentation/configuration.md); before going to production, read [Security](documentation/security.md).

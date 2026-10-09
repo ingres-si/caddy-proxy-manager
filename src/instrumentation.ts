@@ -562,46 +562,57 @@ const EVERY_NODE_JOBS: readonly BackgroundJob[] = [
 
 export async function register() {
   // Only run on the server side
-  if (process.env.NEXT_RUNTIME === "nodejs") {
-    // Stopping (SIGTERM, SIGINT): the image leaves the signals to the
-    // application (NEXT_MANUAL_SIG_HANDLE), which exits once the shutdown
-    // tasks finished (src/lib/shutdown.ts). Installed first, so the server
-    // exits on a signal however far start-up got.
-    const { installShutdownHandler } = await import("./lib/shutdown");
-    installShutdownHandler();
-
-    // Validate production configuration early to catch misconfigurations
-    const { validateProductionConfig } = await import("./lib/config");
-    try {
-      validateProductionConfig();
-    } catch (error) {
-      console.error("Configuration validation failed:", error);
-      if (process.env.NODE_ENV === "production") {
-        // Fail fast in production with bad config
-        throw error;
-      }
-    }
-
-    // High availability (ee/docs/high-availability.md): a leader exits as
-    // soon as its lease can no longer be vouched for; a standby starts none
-    // of the jobs above.
-    const { startLeaderWatchdog } = await import("../ee/high-availability/role");
-    startLeaderWatchdog();
-
-    // The database before anything uses it: schema migrations, then the
-    // one-time data migrations (src/lib/db/startup.ts). Every node runs it;
-    // a standby's read-only copy skips the data migrations.
-    const { runDatabaseStartup } = await import("./lib/db/startup");
-    await runDatabaseStartup();
-
-    // What requests read without waiting for the database (the branding, the
-    // providers Better Auth is built with): loaded here, then read again by
-    // the code that changes it (src/lib/db/cached-value.ts).
-    const { loadStartupCaches } = await import("./lib/startup-caches");
-    await loadStartupCaches();
-
-    const { startBackgroundJobs, startEveryNodeJobs } = await import("./lib/background-jobs");
-    await startEveryNodeJobs(EVERY_NODE_JOBS);
-    await startBackgroundJobs(SERVER_JOBS);
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  try {
+    await startServer();
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") throw error;
+    // Next.js catches an error thrown here and keeps the server running,
+    // answering every request with 500 while the container looks healthy to
+    // `docker compose up`. Exit instead, so the container restarts and
+    // `docker compose ps` and the logs show why.
+    console.error("Ingressi could not start:", error);
+    process.exit(1);
   }
+}
+
+async function startServer() {
+  // Stopping (SIGTERM, SIGINT): the image leaves the signals to the
+  // application (NEXT_MANUAL_SIG_HANDLE), which exits once the shutdown
+  // tasks finished (src/lib/shutdown.ts). Installed first, so the server
+  // exits on a signal however far start-up got.
+  const { installShutdownHandler } = await import("./lib/shutdown");
+  installShutdownHandler();
+
+  // Validate production configuration early to catch misconfigurations
+  const { validateProductionConfig } = await import("./lib/config");
+  try {
+    validateProductionConfig();
+  } catch (error) {
+    // Fail fast in production with bad config (register() exits)
+    if (process.env.NODE_ENV === "production") throw error;
+    console.error("Configuration validation failed:", error);
+  }
+
+  // High availability (ee/docs/high-availability.md): a leader exits as
+  // soon as its lease can no longer be vouched for; a standby starts none
+  // of the jobs above.
+  const { startLeaderWatchdog } = await import("../ee/high-availability/role");
+  startLeaderWatchdog();
+
+  // The database before anything uses it: schema migrations, then the
+  // one-time data migrations (src/lib/db/startup.ts). Every node runs it;
+  // a standby's read-only copy skips the data migrations.
+  const { runDatabaseStartup } = await import("./lib/db/startup");
+  await runDatabaseStartup();
+
+  // What requests read without waiting for the database (the branding, the
+  // providers Better Auth is built with): loaded here, then read again by
+  // the code that changes it (src/lib/db/cached-value.ts).
+  const { loadStartupCaches } = await import("./lib/startup-caches");
+  await loadStartupCaches();
+
+  const { startBackgroundJobs, startEveryNodeJobs } = await import("./lib/background-jobs");
+  await startEveryNodeJobs(EVERY_NODE_JOBS);
+  await startBackgroundJobs(SERVER_JOBS);
 }
