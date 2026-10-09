@@ -165,6 +165,7 @@ describe('alert channels', () => {
     ['a missing name', { type: 'email', config: emailChannel.config }],
     ['a missing recipient', { name: 'x', type: 'email', config: { ...emailChannel.config, to: [] } }],
     ['a bad sender', { name: 'x', type: 'email', config: { ...emailChannel.config, from: 'not-an-address' } }],
+    ['a sender with an empty domain label', { name: 'x', type: 'email', config: { ...emailChannel.config, from: 'alerts@example..com' } }],
     ['an unknown config field', { name: 'x', type: 'email', config: { ...emailChannel.config, bcc: 'x@example.com' } }],
     ['a bad port', { name: 'x', type: 'email', config: { ...emailChannel.config, port: 70000 } }],
     ['an array body', []],

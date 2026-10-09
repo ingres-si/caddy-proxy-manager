@@ -171,7 +171,7 @@ function validateGeneral(value: Record<string, unknown>): void {
   stringValue(required(value, "primaryDomain", "general settings"), "general.primaryDomain", { min: 1, max: 253 });
   if (value.acmeEmail !== undefined) {
     const email = stringValue(value.acmeEmail, "general.acmeEmail", { max: 320 });
-    if (email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) invalid("general.acmeEmail must be a valid email address");
+    if (email.length > 0 && !/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(email)) invalid("general.acmeEmail must be a valid email address");
   }
 }
 

@@ -201,6 +201,15 @@ describe("REST settings runtime validation", () => {
     expect(validateSettingsGroup("acme", { caRootPem })).toEqual({ caRootPem });
   });
 
+  it("validates the ACME e-mail address", () => {
+    for (const acmeEmail of ["admin@example.com", "first.last+tag@mail.example.co.uk"]) {
+      expect(validateSettingsGroup("general", { primaryDomain: "example.com", acmeEmail })).toEqual({ primaryDomain: "example.com", acmeEmail });
+    }
+    for (const acmeEmail of ["admin", "admin@example", "@example.com", "admin@.example.com", "admin@example..com", "admin@example.com."]) {
+      expect(() => validateSettingsGroup("general", { primaryDomain: "example.com", acmeEmail })).toThrow(/valid email address/);
+    }
+  });
+
   it("rejects non-line-break control characters in ACME root PEM values", () => {
     expect(() => validateSettingsGroup("acme", {
       caRootPem: "-----BEGIN CERTIFICATE-----\nsecret\u0000suffix\n-----END CERTIFICATE-----",

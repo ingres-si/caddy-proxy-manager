@@ -66,7 +66,7 @@ export function readSecretInput(value: unknown, field: string, max: number): Sec
   return { kind: "set", value: trimmed };
 }
 
-const EMAIL_ADDRESS = /^[^\s@<>()[\]",;:\\]+@[^\s@<>()[\]",;:\\]+\.[^\s@<>()[\]",;:\\]+$/;
+const EMAIL_ADDRESS = /^[^\s@<>()[\]",;:\\]+@[^\s@<>()[\]",;:\\.]+(?:\.[^\s@<>()[\]",;:\\.]+)+$/;
 
 export function readEmailAddress(value: unknown, field: string): string {
   const text = readText(value, field, 254);
