@@ -13,6 +13,7 @@ Pull the new images and recreate the containers with `docker compose pull && doc
 - **A deleted primary admin stays deleted.** Earlier releases created the `ADMIN_USERNAME` account again on every start after it was deleted. Now only a change to `ADMIN_PASSWORD` or `ADMIN_USERNAME` creates it again.
 - **Security events, a WAF event's detail**: the rules that matched show what they matched where; **Exclude N rules…** reviews and adds all the suggested exclusions at once (`POST /api/v1/waf/exclusions/batch`); blocking a Cloudflare address warns first. **Analytics → Requests** folds runs of identical requests into one row with a count.
 - **The WAF reads bodies of other content types as they are.** Protobuf (OpenTelemetry), octet-stream and other bodies that are not form, multipart, JSON or XML are no longer parsed as form data, which made dozens of attack rules match binary data. Exclusions added for such false positives can be removed.
+- **The web server keeps idle connections for 125 seconds** (`KEEP_ALIVE_TIMEOUT`), longer than Caddy keeps them, so a proxy host in front of the dashboard no longer gets an occasional 502 from a connection the server had just closed. The editors warn that passive health checks on a host with one upstream make Caddy refuse every request for the fail duration after a failure.
 - One database migration runs on start.
 
 ## Upgrading to v2.2.0
