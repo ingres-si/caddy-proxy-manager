@@ -36,6 +36,7 @@ import { logAuditEvent } from '../../src/lib/audit';
 import { setSetting, getSetting } from '../../src/lib/settings';
 import { decryptSecret, isEncryptedSecret } from '../../src/lib/secret';
 import { AI_SETTINGS_KEY } from '../../ee/ai/settings';
+import { config } from '@/src/lib/config';
 
 const SLACK_URL = 'https://hooks.slack.com/services/T000/B000/slack-token-sentinel';
 const SMTP_PASSWORD = 'smtp-password-sentinel';
@@ -174,6 +175,9 @@ describe('alert channels', () => {
   it.each([
     ['a plain-http Slack URL', 'slack', { webhookUrl: 'http://hooks.slack.com/services/x' }],
     ['a URL with credentials', 'webhook', { url: 'https://user:pass@hooks.example.com/' }],
+    ['a link-local webhook URL', 'webhook', { url: 'http://169.254.169.254/latest/meta-data/' }],
+    ["a webhook URL at Caddy's admin API", 'webhook', { url: `${new URL(config.caddyApiUrl).origin}/stop` }],
+    ['an ntfy server on a link-local address', 'ntfy', { serverUrl: 'http://[fe80::1]', topic: 'ops' }],
     ['a missing webhook URL', 'webhook', {}],
     ['a malformed routing key', 'pagerduty', { routingKey: 'bad key!' }],
     ['a bad ntfy topic', 'ntfy', { topic: 'no spaces allowed' }],

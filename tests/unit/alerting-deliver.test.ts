@@ -11,6 +11,8 @@ vi.mock('nodemailer', () => ({
 }));
 
 import { deliverToChannel, describeFetchError, DELIVERY_TIMEOUT_MS } from '@/ee/alerting/deliver';
+import { blockedDestination } from '@/ee/alerting/validation';
+import { config } from '@/src/lib/config';
 import { pagerDutyDedupKey, testNotification, type AlertNotification } from '@/ee/alerting/format';
 import type { ResolvedChannel } from '@/ee/alerting/channels';
 
@@ -126,6 +128,40 @@ describe('ntfy and chat webhooks', () => {
     await deliverToChannel({ id: 7, name: 'Teams', type: 'teams', config: {}, secrets: { webhookUrl: 'https://teams.example.com/hook' } }, firing);
     expect(call(0).body.text).toContain('Upstream 10.0.0.5:8080 is failing');
     expect(call(1).body.attachments[0].contentType).toBe('application/vnd.microsoft.card.adaptive');
+  });
+});
+
+describe('blocked destinations', () => {
+  const caddyAdmin = new URL(config.caddyApiUrl);
+
+  it.each([
+    ['http://169.254.169.254/latest/meta-data/', 'a link-local or cloud metadata address'],
+    ['http://[fe80::1]/hook', 'a link-local or cloud metadata address'],
+    ['http://[::ffff:169.254.169.254]/', 'a link-local or cloud metadata address'],
+    ['http://[fd00:ec2::254]/', 'a link-local or cloud metadata address'],
+    ['http://metadata.google.internal/computeMetadata/v1/', 'a cloud metadata service'],
+    [`${caddyAdmin.origin}/stop`, "Caddy's admin API"],
+    [`${caddyAdmin.protocol}//${caddyAdmin.host.toUpperCase()}/load`, "Caddy's admin API"],
+  ])('names why %s is refused', (url, reason) => {
+    expect(blockedDestination(url)).toBe(reason);
+  });
+
+  it.each([
+    'https://hooks.slack.com/services/x',
+    'http://10.0.0.5:5678/webhook/alerts',
+    'http://localhost:11434/v1',
+    `${caddyAdmin.protocol}//${caddyAdmin.hostname}:${Number(caddyAdmin.port || 80) + 1}/`,
+    'not a url',
+  ])('allows %s', (url) => {
+    expect(blockedDestination(url)).toBeNull();
+  });
+
+  it('refuses a stored channel at a blocked destination without a request', async () => {
+    const channel: ResolvedChannel = { id: 8, name: 'Hook', type: 'webhook', config: {}, secrets: { url: `${caddyAdmin.origin}/stop` } };
+    expect(await deliverToChannel(channel, firing)).toEqual({ ok: false, error: "The endpoint is Caddy's admin API, which is not allowed" });
+    const ntfy: ResolvedChannel = { id: 9, name: 'ntfy', type: 'ntfy', config: { serverUrl: 'http://169.254.169.254', topic: 'ops' }, secrets: {} };
+    expect(await deliverToChannel(ntfy, firing)).toEqual({ ok: false, error: 'The endpoint is a link-local or cloud metadata address, which is not allowed' });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 

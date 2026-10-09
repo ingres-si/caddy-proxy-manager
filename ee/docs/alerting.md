@@ -119,7 +119,7 @@ What is not covered, and why:
 
 Credentials, including webhook URLs that embed a token, are stored encrypted with `SESSION_SECRET` and re-encrypted by the startup rotation pass like every other stored secret. The API and the dashboard only show `has*` flags and, for URLs, the scheme and host. When updating a channel, an omitted or empty secret keeps the stored one and `null` removes an optional one. Changing the SMTP host or the ntfy server requires entering the password or token again, so a stored credential is never sent to a destination it was not entered for.
 
-Delivery uses a 10 s timeout and does not follow redirects. Errors are reduced to fixed messages (HTTP status, connection error code, SMTP error class); URLs, response bodies and exception messages are never stored or shown. The last delivery result is shown per channel; each history entry lists the result per channel.
+A destination may not be a link-local address (where cloud metadata services answer) or Caddy's admin API; the check is made when a channel is saved and again at delivery. Delivery uses a 10 s timeout and does not follow redirects. Errors are reduced to fixed messages (HTTP status, connection error code, SMTP error class); URLs, response bodies and exception messages are never stored or shown. The last delivery result is shown per channel; each history entry lists the result per channel.
 
 **Send test** posts a test notification (for PagerDuty it opens and immediately resolves an incident).
 

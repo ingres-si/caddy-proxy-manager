@@ -9,6 +9,7 @@ import { safeSystemErrorCode } from "@/src/lib/caddy-apply-error";
 import { BRAND_NAME } from "@/src/lib/brand";
 import { getBranding } from "@/ee/white-label/store";
 import type { ResolvedChannel } from "./channels";
+import { blockedDestination } from "./validation";
 import {
   buildEmail,
   buildNtfyMessage,
@@ -70,8 +71,14 @@ export function describeSmtpError(error: unknown): string {
   return code ? `Sending the e-mail failed (${code})` : "Sending the e-mail failed";
 }
 
-/** POSTs JSON without following redirects; throws DeliveryError on a non-2xx answer. */
+/**
+ * POSTs JSON without following redirects; throws DeliveryError on a non-2xx
+ * answer, or without a request when the URL is a blocked destination (a
+ * channel stored or synced before the rule existed).
+ */
 export async function postJson(url: string, body: string, headers: Record<string, string> = {}): Promise<Response> {
+  const blocked = blockedDestination(url);
+  if (blocked) throw new DeliveryError(`The endpoint is ${blocked}, which is not allowed`);
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", "User-Agent": `${BRAND_NAME}-Alerts/1`, ...headers },

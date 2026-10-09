@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Elastic-2.0
+import { BlockList, isIP } from "node:net";
 import { ApiValidationError } from "@/src/lib/api-errors";
+import { config } from "@/src/lib/config";
 import { parseRowId } from "@/src/lib/row-ids";
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -72,9 +74,58 @@ export function readEmailAddress(value: unknown, field: string): string {
   return text;
 }
 
+/** Addresses no notification or provider endpoint lives at: link-local, where cloud metadata services answer. */
+const BLOCKED_ADDRESSES = new BlockList();
+BLOCKED_ADDRESSES.addSubnet("169.254.0.0", 16, "ipv4");
+BLOCKED_ADDRESSES.addSubnet("fe80::", 10, "ipv6");
+BLOCKED_ADDRESSES.addAddress("fd00:ec2::254", "ipv6");
+const METADATA_NAMES = new Set(["metadata.google.internal", "metadata", "instance-data"]);
+
+function hostnameOf(url: URL): string {
+  return url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+}
+
+function effectivePort(url: URL): string {
+  return url.port || (url.protocol === "https:" ? "443" : "80");
+}
+
+/** Caddy's admin API, which answers this container without authentication. */
+const CADDY_ADMIN = ((): { hostname: string; port: string } | null => {
+  try {
+    const url = new URL(config.caddyApiUrl);
+    return { hostname: hostnameOf(url), port: effectivePort(url) };
+  } catch {
+    return null;
+  }
+})();
+
 /**
- * An http(s) URL without credentials or fragment. `https` restricts the
- * scheme. Messages never echo the URL: it may embed a token.
+ * Why requests from this server may not go to `target`: a link-local or cloud
+ * metadata address, or Caddy's admin API. Null when they may. The check is by
+ * the URL's host name, so it is cheap enough to repeat at delivery; it is a
+ * guard against the obvious internal targets, not a network boundary.
+ */
+export function blockedDestination(target: string | URL): string | null {
+  let url: URL;
+  try {
+    url = typeof target === "string" ? new URL(target) : target;
+  } catch {
+    return null;
+  }
+  const hostname = hostnameOf(url);
+  const family = isIP(hostname);
+  if (family !== 0 && BLOCKED_ADDRESSES.check(hostname, family === 6 ? "ipv6" : "ipv4")) {
+    return "a link-local or cloud metadata address";
+  }
+  if (METADATA_NAMES.has(hostname)) return "a cloud metadata service";
+  if (CADDY_ADMIN && hostname === CADDY_ADMIN.hostname && effectivePort(url) === CADDY_ADMIN.port) return "Caddy's admin API";
+  return null;
+}
+
+/**
+ * An http(s) URL without credentials or fragment, not at a blocked
+ * destination. `https` restricts the scheme. Messages never echo the URL: it
+ * may embed a token.
  */
 export function readHttpUrl(value: unknown, field: string, options: { https?: boolean; allowQuery?: boolean } = {}): string {
   if (typeof value !== "string" || value.trim().length === 0) throw new ApiValidationError(`${field} is required`);
@@ -92,6 +143,8 @@ export function readHttpUrl(value: unknown, field: string, options: { https?: bo
   if (url.username || url.password) throw new ApiValidationError(`${field} must not contain a user name or password`);
   if (url.hash) throw new ApiValidationError(`${field} must not contain a fragment`);
   if (!options.allowQuery && url.search) throw new ApiValidationError(`${field} must not contain a query string`);
+  const blocked = blockedDestination(url);
+  if (blocked) throw new ApiValidationError(`${field} must not point at ${blocked}`);
   return trimmed;
 }
 
