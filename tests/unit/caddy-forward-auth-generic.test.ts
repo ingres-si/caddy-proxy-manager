@@ -121,6 +121,10 @@ function routeHost(route: Route): string[] {
   return ((matchSets(route)[0]?.host as string[] | undefined) ?? []);
 }
 
+function servesHost(route: Route, host: string): boolean {
+  return routeHost(route).some((name) => name === host);
+}
+
 function matchSets(route: Route): Array<Record<string, unknown>> {
   return (route.match ?? []) as Array<Record<string, unknown>>;
 }
@@ -161,7 +165,7 @@ describe('generic forward auth: full-site split browser vs API', () => {
     );
 
     const doc = await buildCaddyDocument();
-    const routes = collectRoutes(doc).filter((r) => routeHost(r).includes('app.example.com'));
+    const routes = collectRoutes(doc).filter((r) => servesHost(r, 'app.example.com'));
 
     const browserRoutes = routes.filter((r) => {
       const m = matchSets(r)[0];
@@ -289,7 +293,7 @@ describe('generic forward auth: path modes', () => {
     );
 
     const doc = await buildCaddyDocument();
-    const routes = collectRoutes(doc).filter((r) => routeHost(r).includes('excl.example.com'));
+    const routes = collectRoutes(doc).filter((r) => servesHost(r, 'excl.example.com'));
 
     const excludedRoute = routes.find((r) => (matchSets(r)[0]?.path as string[] | undefined)?.includes('/share/*'));
     expect(excludedRoute).toBeDefined();
@@ -321,7 +325,7 @@ describe('generic forward auth: path modes', () => {
     );
 
     const doc = await buildCaddyDocument();
-    const routes = collectRoutes(doc).filter((r) => routeHost(r).includes('prot.example.com'));
+    const routes = collectRoutes(doc).filter((r) => servesHost(r, 'prot.example.com'));
 
     const protectedRoutes = routes.filter((r) => (matchSets(r)[0]?.path as string[] | undefined)?.includes('/secret/*'));
     expect(protectedRoutes.length).toBe(2);
@@ -359,7 +363,7 @@ describe('generic forward auth: path modes', () => {
     );
 
     const doc = await buildCaddyDocument();
-    const routes = collectRoutes(doc).filter((r) => routeHost(r).includes('bypass.example.com'));
+    const routes = collectRoutes(doc).filter((r) => servesHost(r, 'bypass.example.com'));
 
     const bypassRoute = routes.find((r) => {
       const header = matchSets(r)[0]?.header as Record<string, string[]> | undefined;

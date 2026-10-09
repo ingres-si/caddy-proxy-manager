@@ -75,6 +75,7 @@ function routeHandleArrays(doc: Doc): Handler[][] {
 }
 
 const dials = (h: Handler) => ((h?.upstreams as Array<{ dial?: string }>) ?? []).map((u) => u.dial);
+const dialsTo = (h: Handler, dial: string) => dials(h).some((d) => d === dial);
 const isUpstream = (h: Handler) => h?.handler === 'reverse_proxy' && !h.rewrite && (dials(h).includes(UPSTREAM) || dials(h).includes(LOCATION_UPSTREAM));
 const isInvoke = (name: string) => (h: Handler) => h?.handler === 'invoke' && h.name === name;
 const isVerify = (h: Handler) => h?.handler === 'reverse_proxy' && h.rewrite?.uri === '/api/forward-auth/verify';
@@ -316,7 +317,7 @@ describe('generated configuration', () => {
       rateLimit: { rules: [ipRule] },
     });
     const doc = await buildCaddyDocument();
-    const outpost = routeHandleArrays(doc).find((arr) => arr.some((h) => h.handler === 'reverse_proxy' && dials(h).includes('authentik.example.com:9000') && !h.rewrite))!;
+    const outpost = routeHandleArrays(doc).find((arr) => arr.some((h) => h.handler === 'reverse_proxy' && dialsTo(h, 'authentik.example.com:9000') && !h.rewrite))!;
     expect(outpost.findIndex(isInvoke(`ingressi_rl_h${created.id}`))).toBe(0);
   });
 

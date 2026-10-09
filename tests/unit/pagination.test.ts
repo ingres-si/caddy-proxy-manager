@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DEFAULT_PAGE_SIZE, pageNumbers, paginate, parsePageParam } from '@/src/lib/pagination';
+import { textContent } from '../helpers/text';
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/x', useSearchParams: () => new URLSearchParams('') }));
 const { Pagination } = await import('@/src/components/ui/Pagination');
@@ -52,7 +53,7 @@ describe('Pagination', () => {
   it('links every page and marks the current one', () => {
     const html = renderToStaticMarkup(createElement(Pagination, { page: 2, perPage: 25, total: 60, noun: 'hosts', label: 'Pages of hosts', hrefFor: (p: number) => `/x?page=${p}` }));
     expect(html).toContain('aria-label="Pages of hosts"');
-    expect(html.replace(/<[^>]+>/g, '')).toContain('26–50 of 60 hosts');
+    expect(textContent(html)).toContain('26–50 of 60 hosts');
     expect(html).toContain('href="/x?page=1"');
     expect(html).toContain('href="/x?page=3"');
     expect(html).toMatch(/aria-current="page"[^>]*>|aria-label="Page 2"[^>]*aria-current="page"/);

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createSelfSignedServerCertificate } from '../helpers/certs';
+import { escapeRegExp } from '../helpers/text';
 
 test.describe('Certificates', () => {
   test('page loads with tabs visible', async ({ page }) => {
@@ -260,7 +261,7 @@ test.describe('Certificates', () => {
       await page.goto('/certificates');
       const timeline = page.getByRole('list', { name: /expiry, next 90 days/i });
       // Each marker is a toggle named after the domain and its time left.
-      const escaped = domain.replace(/\./g, '\\.');
+      const escaped = escapeRegExp(domain);
       const marker = timeline.getByRole('button', { name: new RegExp(`^${escaped}: \\d+ days left`) });
       await expect(marker).toBeVisible({ timeout: 10_000 });
       await marker.click();

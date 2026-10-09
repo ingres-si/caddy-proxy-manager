@@ -22,6 +22,7 @@ vi.mock('@/app/(dashboard)/waf/actions', () => ({
 
 import WafSettingsClient from '@/app/(dashboard)/waf/WafSettingsClient';
 import type { WafSettingsPageData } from '@/app/(dashboard)/waf/waf-settings-shared';
+import { textContent } from '../helpers/text';
 
 function data(overrides: Partial<WafSettingsPageData> = {}): WafSettingsPageData {
   return {
@@ -115,13 +116,13 @@ describe('WAF settings page', () => {
     const exclusions = Array.from({ length: 30 }, (_, i) => ({ ...base.exclusions[0], id: 200 + i, ruleId: 920000 + i }));
     const html = render(data({ hosts, exclusions }));
     expect(html).toContain('aria-label="Pages of hosts"');
-    expect(html.replace(/<[^>]+>/g, '')).toContain('1–25 of 60 hosts');
+    expect(textContent(html)).toContain('1–25 of 60 hosts');
     expect(html.match(/aria-label="WAF mode of /g)?.length).toBe(25);
     // Wiki has settings of its own, so it leads the first page although it is listed last.
     expect(html).toContain('aria-label="WAF mode of Wiki"');
     expect(html).not.toContain('aria-label="WAF mode of Host 30"');
     expect(html).toContain('aria-label="Pages of exclusions"');
-    expect(html.replace(/<[^>]+>/g, '')).toContain('1–25 of 30 exclusions');
+    expect(textContent(html)).toContain('1–25 of 30 exclusions');
     expect(html.match(/aria-label="Remove exclusion of rule /g)?.length).toBe(25);
   });
 

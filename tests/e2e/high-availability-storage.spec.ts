@@ -18,6 +18,7 @@
 import { test, expect, type Browser, type BrowserContext } from '@playwright/test';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { writeSettingRow } from '../helpers/e2e-sql';
+import { escapeRegExp } from '../helpers/text';
 
 const MASTER = 'http://localhost:3002';
 const SLAVE = 'http://localhost:3003';
@@ -258,7 +259,7 @@ test.describe.serial('High availability: shared certificate storage (master + sl
     // It is in the shared storage, under this run's prefix.
     await expect.poll(() => valkey('--scan', '--pattern', `${PREFIX}/certificates/*`).split('\n').filter(Boolean), {
       timeout: 30_000,
-    }).toEqual(expect.arrayContaining([expect.stringMatching(new RegExp(`/${DOMAIN.replace(/\./g, '\\.')}\\.crt$`))]));
+    }).toEqual(expect.arrayContaining([expect.stringMatching(new RegExp(`/${escapeRegExp(DOMAIN)}\\.crt$`))]));
 
     // The slave comes back and receives the host.
     const restarted = new Date().toISOString();

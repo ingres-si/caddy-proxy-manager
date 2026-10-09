@@ -17,6 +17,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/src/lib/auth-client', () => ({ authClient: { signIn: { social: vi.fn() } } }));
 
 import ProfileClient from '@/app/(dashboard)/profile/ProfileClient';
+import { textContent } from '../helpers/text';
 
 type Props = Parameters<typeof ProfileClient>[0];
 
@@ -187,7 +188,7 @@ describe('profile passkeys, sessions, tokens and enforced SSO', () => {
     const first = render({ signInUsername: 'alice' }, {}, { sessions: sessions as never });
     expect(first).toContain('aria-label="Sign out Device 25"');
     expect(first).not.toContain('aria-label="Sign out Device 26"');
-    expect(first.replace(/<[^>]+>/g, '')).toContain('1–25 of 30 sessions');
+    expect(textContent(first)).toContain('1–25 of 30 sessions');
     expect(first).toContain('href="/profile?sessions=2"');
 
     navigation.search = new URLSearchParams('sessions=2');
@@ -195,7 +196,7 @@ describe('profile passkeys, sessions, tokens and enforced SSO', () => {
       const second = render({ signInUsername: 'alice' }, {}, { sessions: sessions as never });
       expect(second).toContain('aria-label="Sign out Device 26"');
       expect(second).not.toContain('aria-label="Sign out Device 25"');
-      expect(second.replace(/<[^>]+>/g, '')).toContain('26–30 of 30 sessions');
+      expect(textContent(second)).toContain('26–30 of 30 sessions');
     } finally {
       navigation.search = new URLSearchParams();
     }

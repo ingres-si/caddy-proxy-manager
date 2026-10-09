@@ -47,6 +47,7 @@ import {
 } from '@/ee/alerting/ui/format';
 import type { AlertChannelView, AlertEventView, AlertRuleView, AlertSilenceView, FiringAlertView } from '@/ee/alerting/types';
 import type { DigestSettingsView } from '@/ee/ai/types';
+import { textContent } from '../helpers/text';
 
 const stamp = '2026-10-02T10:00:00.000Z';
 const now = Date.parse('2026-10-02T11:00:00.000Z');
@@ -162,7 +163,7 @@ describe('Alerts page', () => {
   it('keeps dismissed and muted alerts listed, marked, with Undo for writers', () => {
     const quiet = [{ ...firing[0], dismissal, mute }];
     const html = render('firing', { firing: quiet });
-    const text = html.replace(/<[^>]+>/g, '');
+    const text = textContent(html);
     expect(text).toContain('Dismissed · Alex Morgan');
     expect(text).toContain('Backend team is on it');
     expect(text).toContain('Rule muted until 18:00 · Alex Morgan');
@@ -175,7 +176,7 @@ describe('Alerts page', () => {
     expect(html).toMatch(/role="tab"[^>]*>Open <span[^>]*>0<\/span>/);
 
     const reader = render('firing', { firing: quiet, canWrite: false });
-    expect(reader.replace(/<[^>]+>/g, '')).toContain('Dismissed · Alex Morgan');
+    expect(textContent(reader)).toContain('Dismissed · Alex Morgan');
     expect(reader).not.toContain('>Undo<');
     expect(reader).not.toContain('>Unmute<');
   });
@@ -231,11 +232,11 @@ describe('Alerts page', () => {
     expect(html).not.toMatch(/disabled=""[^>]*aria-label="Mute rule /);
 
     const muted = render('rules', { rules: [rules[0], { ...rules[1], mute }] });
-    expect(muted.replace(/<[^>]+>/g, '')).toContain('Muted until 18:00');
+    expect(textContent(muted)).toContain('Muted until 18:00');
     expect(muted).toMatch(/aria-label="Unmute rule Upstreams"/);
     expect(muted).not.toMatch(/disabled=""[^>]*aria-label="Unmute rule Upstreams"/);
     const reader = render('rules', { rules: [rules[0], { ...rules[1], mute }], canWrite: false });
-    expect(reader.replace(/<[^>]+>/g, '')).toMatch(/Muted until \d/);
+    expect(textContent(reader)).toMatch(/Muted until \d/);
     expect(reader).not.toContain('Unmute');
     expect(reader).not.toContain('Mute…');
   });
@@ -270,7 +271,7 @@ describe('Alerts page', () => {
   it('pages the history with the shared pager, linking each page', () => {
     const html = render('history', { history: { events, total: 60, page: 2, perPage: 25 } });
     expect(html).toContain('aria-label="Pages of alert history"');
-    expect(html.replace(/<[^>]+>/g, '')).toContain('26–50 of 60 alerts');
+    expect(textContent(html)).toContain('26–50 of 60 alerts');
     expect(html).toContain('href="/alerts?tab=history"');
     expect(html).toContain('href="/alerts?tab=history&amp;page=3"');
   });
@@ -280,14 +281,14 @@ describe('Alerts page', () => {
     const rulesHtml = render('rules', { rules: manyRules });
     expect(rulesHtml).toContain('aria-label="Search rules"');
     expect(rulesHtml).toContain('aria-label="Pages of rules"');
-    expect(rulesHtml.replace(/<[^>]+>/g, '')).toContain('1–25 of 30 rules');
+    expect(textContent(rulesHtml)).toContain('1–25 of 30 rules');
     expect(rulesHtml.match(/aria-label="Edit rule /g)?.length).toBe(25);
 
     const manyChannels = Array.from({ length: 27 }, (_, i) => ({ ...channels[0], id: 100 + i, name: `Mail ${i}` }));
     const channelsHtml = render('channels', { channels: manyChannels });
     expect(channelsHtml).toContain('aria-label="Search channels"');
     expect(channelsHtml).toContain('aria-label="Pages of channels"');
-    expect(channelsHtml.replace(/<[^>]+>/g, '')).toContain('1–25 of 27 channels');
+    expect(textContent(channelsHtml)).toContain('1–25 of 27 channels');
   });
 
   it('is read-only without alerts:write', () => {

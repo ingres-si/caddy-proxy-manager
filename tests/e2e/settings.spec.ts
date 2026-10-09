@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { escapeRegExp } from '../helpers/text';
 
 /**
  * The settings pages: Settings itself (the general settings), and the
@@ -94,7 +95,7 @@ test.describe('Settings — old links', () => {
 
     for (const [id, path] of [['sync', '/instances'], ['geoblock', '/geo-blocking'], ['rate-limit', '/rate-limiting'], ['oauth', '/oauth-providers'], ['backups', '/backups'], ['high-availability', '/high-availability']]) {
       await page.goto(`/settings?section=${id}`);
-      await expect(page, id).toHaveURL(new RegExp(`${path.replace(/\//g, '\\/')}$`));
+      await expect(page, id).toHaveURL(new RegExp(`${escapeRegExp(path)}$`));
     }
   });
 

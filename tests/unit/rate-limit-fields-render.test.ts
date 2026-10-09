@@ -7,11 +7,12 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { RateLimitFields, RateLimitSettingsFields } from '@/src/components/proxy-hosts/RateLimitFields';
+import { decodeEntities } from '../helpers/text';
 
 function hiddenValue(html: string, name: string): string {
   const match = new RegExp(`<input type="hidden" name="${name}" value="([^"]*)"`).exec(html);
   if (!match) throw new Error(`no hidden input ${name}`);
-  return match[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#x27;/g, "'");
+  return decodeEntities(match[1]);
 }
 
 describe('RateLimitFields', () => {

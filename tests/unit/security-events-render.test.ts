@@ -25,6 +25,7 @@ vi.mock('@/app/(dashboard)/security/actions', () => ({ wafAuditRecordAction: vi.
 
 import SecurityClient from '@/app/(dashboard)/security/SecurityClient';
 import type { SecurityPageData } from '@/app/(dashboard)/security/security-types';
+import { textContent as text } from '../helpers/text';
 
 const START = 1_790_424_000;
 const STEP = 10_800;
@@ -104,7 +105,6 @@ function data(overrides: Partial<SecurityPageData> = {}): SecurityPageData {
 }
 
 const render = (value: SecurityPageData) => renderToStaticMarkup(createElement(SecurityClient, { data: value }));
-const text = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 
 describe('Security events page', () => {
   it('shows the rule set, the summary by source and the tiles', () => {

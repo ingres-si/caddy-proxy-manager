@@ -10,6 +10,7 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
+import { escapeRegExp } from '../helpers/text';
 
 // ClickHouse HTTP port is exposed to the host by tests/docker-compose.test.yml.
 function makeClient(): ClickHouseClient {
@@ -67,7 +68,7 @@ test.describe('Analytics filters', () => {
 
       // Only on a row: only that host is left, and the toast says so.
       await hostsPanel(page).getByRole('button', { name: `Only: Host is ${hostA}` }).click();
-      await expect(page).toHaveURL(new RegExp(`filter=host%3A${hostA.replace(/\./g, '\\.')}`));
+      await expect(page).toHaveURL(new RegExp(`filter=host%3A${escapeRegExp(hostA)}`));
       await expect(page.getByRole('button', { name: `Remove filter: Host is ${hostA}` })).toBeVisible();
       await expect(page.getByText(`Showing only Host is ${hostA}`)).toBeVisible();
       await expect(hostsPanel(page).getByText(hostB, { exact: true })).not.toBeVisible({ timeout: 15_000 });
@@ -114,7 +115,7 @@ test.describe('Analytics filters', () => {
       const search = bar.getByRole('combobox', { name: 'Search values to filter by' });
       await search.fill(hostB.slice(0, 6));
       const found = page.getByRole('listbox', { name: 'Filters to add' });
-      await expect(found.getByRole('option', { name: new RegExp(`Host\\s+${hostB.replace(/[.]/g, '\\.')}`) })).toBeVisible({ timeout: 15_000 });
+      await expect(found.getByRole('option', { name: new RegExp(`Host\\s+${escapeRegExp(hostB)}`) })).toBeVisible({ timeout: 15_000 });
       await found.getByRole('option', { name: /Host contains/ }).click();
       await expect(page).toHaveURL(/filter=%7Ehost/);
       // Clicking the operator turns the filter around.

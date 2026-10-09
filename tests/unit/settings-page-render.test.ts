@@ -64,6 +64,7 @@ import { countChanges } from '@/src/components/settings/settings-form';
 import { NAV_PAGES } from '../../src/lib/navigation';
 import { SETTINGS_PAGES, SETTINGS_SECTIONS, findSettingsSection, settingsSectionHref } from '../../src/lib/settings-sections';
 import { GEOIP_ASN_DB, GEOIP_COUNTRY_DB, getGeoIpDatabases, getGeoIpStatus } from '../../src/lib/geoip-status';
+import { decodeEntities } from '../helpers/text';
 
 /** Every id `/settings?section=` (or `#`) accepted by the old Settings page. */
 const OLD_SECTION_IDS = [
@@ -74,7 +75,7 @@ const OLD_SECTION_IDS = [
 ];
 
 function decode(html: string): string {
-  return html.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
+  return decodeEntities(html);
 }
 
 describe('where each setting is', () => {
