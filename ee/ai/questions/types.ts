@@ -62,11 +62,13 @@ export const QUESTION_RATE_LIMITS = {
 } as const;
 /** Longest range a question covers (as the analytics page). */
 export const MAX_QUESTION_RANGE_DAYS = 92;
+/** Longest "last N minutes" range: a day (longer periods are presets or dates). */
+export const MAX_QUESTION_RANGE_MINUTES = 1440;
 
 export type QuestionFilter = { dim: QuestionDimension; op: "is" | "is_not"; value: string };
 
 /** A range ending now, or calendar dates in UTC (both inclusive; "now" as the end). */
-export type QuestionRange = { preset: QuestionRangePreset } | { from: string; to: string };
+export type QuestionRange = { preset: QuestionRangePreset } | { minutes: number } | { from: string; to: string };
 
 /** The structured query: everything a question can ask for, nothing else. */
 export type QuestionQuery = {

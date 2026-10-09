@@ -181,6 +181,22 @@ describe('ranges', () => {
     expect(sinceTuesday.end).toBeGreaterThanOrEqual(now);
   });
 
+  it('resolves the last N minutes, ending now, and reads them back in words', () => {
+    const now = Date.parse('2026-10-09T15:42:30Z') / 1000;
+    expect(parseQuestionQuery({ metric: 'errors', breakdown: 'status', range: { minutes: 3 } }).range).toEqual({ minutes: 3 });
+    const three = resolveQuestionRange({ minutes: 3 }, now);
+    expect(three).toMatchObject({ preset: 'custom', step: 60 });
+    expect(three.start).toBe(Date.parse('2026-10-09T15:39:00Z') / 1000);
+    expect(three.end).toBeGreaterThanOrEqual(now);
+    expect(describeRange({ minutes: 3 })).toBe('the last 3 minutes');
+    expect(describeRange({ minutes: 1 })).toBe('the last minute');
+    expect(describeRange({ minutes: 360 })).toBe('the last 6 hours');
+    for (const minutes of [0, 1441, 2.5, '3']) {
+      expect(() => parseQuestionQuery({ metric: 'errors', breakdown: 'none', range: { minutes } }), String(minutes)).toThrow(/range\.minutes/);
+    }
+    expect(() => parseQuestionQuery({ metric: 'errors', breakdown: 'none', range: { minutes: 3, from: '2026-10-01' } })).toThrow();
+  });
+
   it('refuses periods that have not started, run backwards or are too long', () => {
     expect(() => resolveQuestionRange({ from: '2026-10-05', to: 'now' }, now)).toThrow(/not started/);
     expect(() => resolveQuestionRange({ from: '2026-09-29', to: '2026-09-01' }, now)).toThrow(/ends before it starts/);

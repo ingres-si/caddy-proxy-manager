@@ -121,12 +121,20 @@ const PRESET_WORDS: Record<string, string> = {
   "30d": "the last 30 days",
 };
 
+/** "the last 3 minutes", "the last hour", "the last 6 hours". */
+function minutesWords(minutes: number): string {
+  if (minutes === 1) return "the last minute";
+  if (minutes % 60 === 0) return minutes === 60 ? "the last hour" : `the last ${minutes / 60} hours`;
+  return `the last ${minutes} minutes`;
+}
+
 /**
  * A question's own range in words, without resolving it ("the last 7 days",
  * "26 Sep–3 Oct 2026", "29 Sep 2026 to now"): how a saved question reads.
  */
 export function describeRange(range: QuestionRange): string {
   if ("preset" in range) return PRESET_WORDS[range.preset] ?? range.preset;
+  if ("minutes" in range) return minutesWords(range.minutes);
   const from = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(range.from) ? `${range.from}T00:00:00Z` : range.from) / 1000;
   if (!Number.isFinite(from)) return `${range.from} to ${range.to}`;
   if (range.to === "now") {

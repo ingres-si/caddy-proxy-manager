@@ -83,6 +83,13 @@ describe('summary prompt', () => {
     expect(hidden.prompt.user).toContain('"value": "DE"');
   });
 
+  it('offers periods of any length, so a short window is not asked back', () => {
+    const { system } = buildInterpretationPrompt('is /suggest broken in the last 3 minutes?', { now: NOW, retentionDays: 30 }, 'abc123');
+    expect(system).toContain('{"minutes": N}');
+    expect(system).toContain('"the last 3 minutes" is {"minutes": 3}');
+    expect(system).toContain('never ask back only because it is not a preset');
+  });
+
   it('tells the model the data is untrusted and asks for plain sentences', () => {
     const built = buildSummaryPrompt({ question: 'q?', query: byIp, result: ipResult(), shareRequestDetails: false });
     expect(built.prompt.system).toMatch(/untrusted/);

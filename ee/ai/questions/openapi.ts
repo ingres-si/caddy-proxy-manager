@@ -10,6 +10,7 @@ import {
   MAX_QUESTION_LENGTH,
   MAX_QUESTION_LIMIT,
   MAX_QUESTION_RANGE_DAYS,
+  MAX_QUESTION_RANGE_MINUTES,
   MAX_QUESTION_TAGS,
   QUESTION_BREAKDOWNS,
   QUESTION_COMPARISONS,
@@ -178,6 +179,12 @@ export const QUESTIONS_OPENAPI_SCHEMAS = {
       range: {
         oneOf: [
           { type: "object", additionalProperties: false, required: ["preset"], properties: { preset: { type: "string", enum: [...QUESTION_RANGE_PRESETS] } } },
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["minutes"],
+            properties: { minutes: { type: "integer", minimum: 1, maximum: MAX_QUESTION_RANGE_MINUTES, description: "The last N minutes, ending now" } },
+          },
           {
             type: "object",
             additionalProperties: false,

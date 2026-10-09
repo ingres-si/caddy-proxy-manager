@@ -82,6 +82,8 @@ function toSeconds(text: string, endOfDay: boolean): number {
  */
 export function resolveQuestionRange(range: QuestionRange, now: number): ResolvedRange {
   if ("preset" in range) return resolveRange({ range: range.preset }, now);
+  // The last N minutes, ending now (minute buckets, so it starts at the minute).
+  if ("minutes" in range) return resolveRange({ from: now - range.minutes * 60, to: now }, now);
   const from = toSeconds(range.from, false);
   const to = Math.min(range.to === "now" ? now : toSeconds(range.to, true), now);
   if (from >= now) throw new ApiValidationError("the period has not started yet");

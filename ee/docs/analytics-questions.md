@@ -39,7 +39,7 @@ A question that is ambiguous gets a short question back ("For which period and h
 | `breakdown` | `none` (one total), `time` (over time), or a dimension ranked: `host`, `path`, `country`, `asn`, `status`, `method`, `protocol`, `ip`, `user_agent`, `outcome`, `waf_rule`. `bytes` allows `none`, `time` and `host`; `visitors` `none` and `time` |
 | `filters` | At most 10 `{dim, op: "is" \| "is_not", value}`, validated like the Analytics filters |
 | `hostTags` | At most 5 proxy host tags |
-| `range` | `{"preset": "1h" \| "24h" \| "7d" \| "30d"}`, or `{"from": "YYYY-MM-DD", "to": "YYYY-MM-DD" \| "now"}` in UTC (both days included), at most 92 days, capped at now |
+| `range` | `{"preset": "1h" \| "24h" \| "7d" \| "30d"}`; `{"minutes": N}` for the last N minutes (1 to 1440, minute buckets); or `{"from": …, "to": … \| "now"}` with dates `YYYY-MM-DD` in UTC (both days included) or date-times with a time zone, at most 92 days, capped at now |
 | `comparison` | `none`, or `previous_period` (the same length right before) |
 | `limit` | 1 to 50 values listed by a breakdown (bytes by host: at most 10) |
 

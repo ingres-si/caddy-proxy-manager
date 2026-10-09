@@ -20,6 +20,7 @@ import { ApiValidationError } from "@/src/lib/api-errors";
 import { DIMENSION_SPECS } from "@/src/lib/analytics/dimensions";
 import { isValidTag } from "@/src/lib/host-tags";
 import {
+  MAX_QUESTION_RANGE_MINUTES,
   DEFAULT_QUESTION_LIMIT,
   MAX_QUESTION_FILTERS,
   MAX_QUESTION_LENGTH,
@@ -154,6 +155,14 @@ function parseRange(value: unknown): QuestionRange {
   if ("preset" in record) {
     rejectUnknownKeys(record, ["preset"], "range");
     return { preset: oneOf<QuestionRangePreset>(record.preset, QUESTION_RANGE_PRESETS, "range.preset") };
+  }
+  if ("minutes" in record) {
+    rejectUnknownKeys(record, ["minutes"], "range");
+    const minutes = record.minutes;
+    if (typeof minutes !== "number" || !Number.isInteger(minutes) || minutes < 1 || minutes > MAX_QUESTION_RANGE_MINUTES) {
+      throw new ApiValidationError(`range.minutes must be a whole number from 1 to ${MAX_QUESTION_RANGE_MINUTES}`);
+    }
+    return { minutes };
   }
   rejectUnknownKeys(record, ["from", "to"], "range");
   const from = parseInstantText(record.from, "from", false);
