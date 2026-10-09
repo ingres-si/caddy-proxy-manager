@@ -6,7 +6,7 @@
  * SecLang.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { buildWafHandler, filterCustomDirectives, listDroppedWafDirectives, resolveEffectiveWaf, wafExclusionsForHost } from '../../src/lib/caddy-waf';
+import { buildWafHandler, filterCustomDirectives, listDroppedWafDirectives, RAW_BODY_RULE, RAW_BODY_RULE_ID, resolveEffectiveWaf, wafExclusionsForHost } from '../../src/lib/caddy-waf';
 import {
   ANOMALY_EVALUATION_RULE_IDS,
   crsTuningDirectives,
@@ -147,12 +147,27 @@ describe('crsTuningDirectives', () => {
 
 describe('buildWafHandler with tuning', () => {
   it('generates exactly the untuned directives when nothing is tuned', () => {
-    expect(directivesOf(crsWaf).slice(0, 4)).toEqual([
+    expect(directivesOf(crsWaf).slice(0, 5)).toEqual([
       'Include @coraza.conf-recommended',
       'Include @crs-setup.conf.example',
+      RAW_BODY_RULE,
       'Include @owasp_crs/*.conf',
       'SecRuleEngine On',
     ]);
+  });
+
+  it('reads bodies of other content types raw (not as form data), only with the CRS, and reserves the rule id', () => {
+    const lines = directivesOf(crsWaf);
+    const at = (line: string) => lines.indexOf(line);
+    expect(at(RAW_BODY_RULE)).toBeGreaterThan(at('Include @crs-setup.conf.example'));
+    expect(at(RAW_BODY_RULE)).toBeLessThan(at('Include @owasp_crs/*.conf'));
+    // The same condition as CRS rule 901340: form, multipart, XML and JSON keep their parsers.
+    expect(RAW_BODY_RULE).toContain('"!@rx (?:URLENCODED|MULTIPART|XML|JSON)"');
+    expect(RAW_BODY_RULE).toContain('ctl:requestBodyProcessor=RAW');
+    expect(directivesOf({ ...crsWaf, load_owasp_crs: false })).not.toContain(RAW_BODY_RULE);
+    // A custom rule cannot take its id.
+    const custom = directivesOf({ ...crsWaf, custom_directives: `SecRule ARGS "@contains x" "id:${RAW_BODY_RULE_ID},deny"` });
+    expect(custom.filter((line) => line.includes('"@contains x"'))).toEqual([]);
   });
 
   it('places tuning and runtime exclusions between the setup and the rules, and updates after the rules', () => {

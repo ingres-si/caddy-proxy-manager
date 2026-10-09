@@ -934,6 +934,24 @@ export const WEBSOCKET_UPGRADE_MATCHER: Record<string, unknown> = {
   },
 };
 
+/** The rule id of RAW_BODY_RULE: outside the CRS and below the exclusion records' range. */
+export const RAW_BODY_RULE_ID = 1_899_999_000;
+
+/**
+ * Bodies of a content type no parser is set for (protobuf, octet-stream, gRPC
+ * and the like) are read as they are, into REQUEST_BODY. The CRS turns on
+ * forceRequestBodyVariable for them (rule 901340), which ModSecurity answers
+ * with REQUEST_BODY alone, but Coraza with its URL-encoded parser: every
+ * "&"- and "="-separated fragment of binary data becomes an argument, and an
+ * OpenTelemetry trace or a file upload matches dozens of attack rules
+ * (coraza#938). Same condition as 901340, so form, multipart, XML and JSON
+ * bodies keep their parsers; the CRS still refuses content types outside
+ * tx.allowed_request_content_type (920420).
+ */
+export const RAW_BODY_RULE =
+  `SecRule REQBODY_PROCESSOR "!@rx (?:URLENCODED|MULTIPART|XML|JSON)" ` +
+  `"id:${RAW_BODY_RULE_ID},phase:1,pass,t:none,nolog,noauditlog,ctl:requestBodyProcessor=RAW"`;
+
 /**
  * Builds the Caddy `waf` handler object for the given WAF settings.
  *
@@ -965,7 +983,7 @@ export function buildWafHandler(
       `[waf] ${typeof source === 'string' ? source : source.label}: ${exclusionDirectives.skipped.length} stored rule exclusion(s) are invalid and left out (ids ${exclusionDirectives.skipped.map((e) => e.id).join(', ')})`
     );
   }
-  const generatedRuleIds = new Set([...tuning.ruleIds, ...exclusionDirectives.ruleIds]);
+  const generatedRuleIds = new Set([...tuning.ruleIds, ...exclusionDirectives.ruleIds, ...(waf.load_owasp_crs ? [RAW_BODY_RULE_ID] : [])]);
 
   // `mode` is interpolated straight into the directive block, and settings are
   // stored without validation — so anything other than a known engine mode
@@ -980,6 +998,8 @@ export function buildWafHandler(
     parts.push(
       'Include @coraza.conf-recommended',
       'Include @crs-setup.conf.example',
+      // After coraza.conf-recommended picks JSON and XML, before the CRS forces a body variable.
+      RAW_BODY_RULE,
       // The tuning SecActions set tx variables the CRS only defaults when unset.
       ...tuning.beforeRules,
       // Runtime exclusions run in phase 1 ahead of every rule they exclude.

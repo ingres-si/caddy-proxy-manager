@@ -12,6 +12,7 @@ Pull the new images and recreate the containers with `docker compose pull && doc
 - **An L4 host has a page too.** `/l4-proxy-hosts/<id>` has the tabs Overview, Routing, Load balancing, Security, Advanced and History, and a new L4 host is created at `/l4-proxy-hosts/new`; the details panel and the create and edit dialogs of the L4 hosts list are gone.
 - **A deleted primary admin stays deleted.** Earlier releases created the `ADMIN_USERNAME` account again on every start after it was deleted. Now only a change to `ADMIN_PASSWORD` or `ADMIN_USERNAME` creates it again.
 - **Security events, a WAF event's detail**: the rules that matched show what they matched where; **Exclude N rules…** reviews and adds all the suggested exclusions at once (`POST /api/v1/waf/exclusions/batch`); blocking a Cloudflare address warns first. **Analytics → Requests** folds runs of identical requests into one row with a count.
+- **The WAF reads bodies of other content types as they are.** Protobuf (OpenTelemetry), octet-stream and other bodies that are not form, multipart, JSON or XML are no longer parsed as form data, which made dozens of attack rules match binary data. Exclusions added for such false positives can be removed.
 - One database migration runs on start.
 
 ## Upgrading to v2.2.0

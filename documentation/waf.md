@@ -44,6 +44,8 @@ These values are global. Hosts that merge with the global settings use them; a h
 
 Coraza holds each request body to inspect it. With the Core Rule Set its limit is 12.5 MiB, which is why large uploads fail with `413`. **Largest body inspected** and **Kept in memory** change it (in MiB, up to 1,024, Coraza's maximum). **Over the limit**: reject with `413`, or inspect the start and forward the rest. Hosts can set their own limits.
 
+Form, multipart, JSON and XML bodies are parsed into arguments the rules check. Bodies of any other content type (protobuf such as OpenTelemetry traces, `application/octet-stream`, gRPC) are inspected as they are, as one value: Coraza would otherwise read them as form data, and every fragment of binary data would become an argument that dozens of attack rules match. The Core Rule Set still refuses content types it does not allow (rule 920420); exclude 920420 for the path of an API that takes such bodies.
+
 ## Per-host mode
 
 Each proxy host has a WAF mode:
