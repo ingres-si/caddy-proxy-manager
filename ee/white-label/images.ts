@@ -75,10 +75,10 @@ export function looksLikeMarkupDocument(data: Buffer): boolean {
  * by chance with negligible probability.
  */
 const EMBEDDED_MARKUP =
-  /<(?:script|html|body|head|iframe|frame|object|embed|style|meta|link|form|svg|math|template|base)[\s/>]|<\?xml|<\?php|<!doctype|<!entity|<!\[cdata\[|javascript:|vbscript:|\bon(?:error|load)\s*=/;
+  /<(?:script|html|body|head|iframe|frame|object|embed|style|meta|link|form|svg|math|template|base)[\s/>]|<\?xml|<\?php|<!doctype|<!entity|<!\[cdata\[|javascript:|vbscript:|\bon(?:error|load)\s*=/i;
 
 export function containsEmbeddedMarkup(data: Buffer): boolean {
-  return EMBEDDED_MARKUP.test(data.toString("latin1").toLowerCase());
+  return EMBEDDED_MARKUP.test(data.toString("latin1"));
 }
 
 // ── PNG ────────────────────────────────────────────────────────────────
