@@ -16,6 +16,7 @@ import { ApiValidationError } from "@/src/lib/api-errors";
 import { logAuditEvent } from "@/src/lib/audit";
 import { RULE_TYPE_DESCRIPTIONS, RULE_TYPE_LABELS, isRuleType, type Severity } from "@/ee/alerting/types";
 import { getAiProviderConfig, ANTHROPIC_API_URL, type ResolvedAiProvider } from "./settings";
+import { findProxyHostForRequestHost } from "@/src/lib/waf-suppression";
 
 export const AI_MAX_TOKENS = 1024;
 const MAX_EXPLANATION_CHARS = 1200;
@@ -140,6 +141,31 @@ async function callAnthropic(provider: ResolvedAiProvider, prompt: ModelPrompt, 
     .join("\n");
 }
 
+/**
+ * "The provider answered with HTTP 403", and, when the provider's host is a
+ * proxy host of this install, that its WAF or access rules may be what
+ * refused: a prompt is long free text that the Core Rule Set easily takes for
+ * an attack. The fix is the provider's own address, which skips them.
+ */
+export async function providerHttpError(baseUrl: string | null, status: number): Promise<string> {
+  const message = `The provider answered with HTTP ${status}`;
+  if (status !== 403 || !baseUrl) return message;
+  try {
+    const url = new URL(baseUrl);
+    const { listProxyHosts } = await import("@/src/lib/models/proxy-hosts");
+    const host = findProxyHostForRequestHost(await listProxyHosts(), url.hostname);
+    if (!host) return message;
+    const upstream = host.upstreams[0]?.replace(/\/+$/, "");
+    const direct = upstream && /^https?:\/\//.test(upstream) ? `, such as ${upstream}${url.pathname.replace(/\/+$/, "")},` : "";
+    return (
+      `${message}. ${url.hostname} is a proxy host of this install, so its WAF or access rules may have refused the prompt ` +
+      `(see Security events). Set the provider's own address in AI settings${direct} so the request does not pass through them.`
+    );
+  } catch {
+    return message;
+  }
+}
+
 async function callOpenAiCompatible(provider: ResolvedAiProvider, prompt: ModelPrompt, signal: AbortSignal): Promise<string> {
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: "POST",
@@ -160,7 +186,7 @@ async function callOpenAiCompatible(provider: ResolvedAiProvider, prompt: ModelP
     signal,
   });
   const body = await response.text();
-  if (!response.ok) throw new ProviderError(`The provider answered with HTTP ${response.status}`);
+  if (!response.ok) throw new ProviderError(await providerHttpError(provider.baseUrl, response.status));
   if (body.length > MAX_RESPONSE_BYTES) throw new ProviderError("The provider's answer was too large");
   let parsed: unknown;
   try {
