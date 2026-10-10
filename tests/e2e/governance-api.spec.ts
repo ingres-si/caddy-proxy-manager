@@ -16,7 +16,8 @@ test.describe('Governance API', () => {
     const body = await response.json();
     expect(body).toMatchObject({ counts: expect.any(Object), truncated: expect.any(Boolean) });
     const sources = body.sources.map((source: { id: string }) => source.id);
-    expect(sources).toEqual(expect.arrayContaining(['certificates', 'alerts', 'approvals', 'my_reviews', 'setup']));
+    // Certificates are left out while the built-in certificate alert rule watches every host.
+    expect(sources).toEqual(expect.arrayContaining(['alerts', 'approvals', 'my_reviews', 'setup']));
     for (const source of body.sources) expect(['ok', 'error', 'timeout']).toContain(source.status);
   });
 

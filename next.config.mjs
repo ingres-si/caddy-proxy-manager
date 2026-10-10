@@ -74,7 +74,8 @@ const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   // The proxy host form became a page: the old deep links /proxy-hosts?create=1
-  // (with an optional &domain=, which is passed along) and ?edit=<id> open it.
+  // (with an optional &domain=, which is passed along) and ?edit=<id> (at
+  // Routing, where the form started) open it.
   async redirects() {
     return [
       {
@@ -86,7 +87,7 @@ const nextConfig = {
       {
         source: '/proxy-hosts',
         has: [{ type: 'query', key: 'edit', value: '(?<id>\\d{1,15})' }],
-        destination: '/proxy-hosts/:id/edit',
+        destination: '/proxy-hosts/:id/edit?section=routing',
         permanent: false,
       },
     ];

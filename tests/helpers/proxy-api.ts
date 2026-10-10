@@ -257,12 +257,15 @@ export async function createProxyHost(page: Page, config: ProxyHostConfig): Prom
   if (config.enableWaf) {
     await openEditorSection(page, 'Security');
     const waf = page.locator('#waf');
-    await waf.getByRole('button', { name: /^Block\b/ }).click();
+    await waf.getByRole('radio', { name: /^Block\b/ }).click();
+    // Global settings, the Core Rule Set and directives are under Advanced.
+    const advanced = waf.getByRole('button', { name: /^Advanced/ });
+    if ((await advanced.getAttribute('aria-expanded')) !== 'true') await advanced.click();
     await waf
-      .getByRole('group', { name: 'Rules for this host' })
-      .getByRole('button', { name: (config.wafMode ?? 'override') === 'override' ? 'Override global' : 'Merge with global' })
+      .getByRole('group', { name: 'Global WAF settings' })
+      .getByRole('button', { name: (config.wafMode ?? 'override') === 'override' ? 'Ignore them' : 'Use them too' })
       .click();
-    await page.getByRole('checkbox', { name: /Load the OWASP Core Rule Set/ }).setChecked(config.wafLoadOwaspCrs !== false);
+    await setEditorSwitch(page, 'OWASP Core Rule Set', config.wafLoadOwaspCrs !== false);
     if (config.wafCustomDirectives) await page.getByLabel(/Custom SecLang directives/).fill(config.wafCustomDirectives);
   }
 

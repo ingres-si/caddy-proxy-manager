@@ -58,7 +58,8 @@ test.describe('Alerts', () => {
     const scope = dialog.getByRole('group', { name: 'Hosts the rule watches' });
     await expect(scope.getByRole('button', { name: 'All hosts' })).toHaveAttribute('aria-pressed', 'true');
     await scope.getByRole('button', { name: 'Chosen hosts' }).click();
-    await expect(dialog.getByRole('button', { name: 'Search and choose proxy hosts' })).toBeVisible();
+    // The host search, or a note when the stack has no proxy hosts yet.
+    await expect(dialog.getByRole('button', { name: 'Search and choose proxy hosts' }).or(dialog.getByText('There are no proxy hosts yet.'))).toBeVisible();
     await expect(dialog.getByLabel('Fire after the condition held for')).toBeVisible();
 
     // Every rule type can be chosen.

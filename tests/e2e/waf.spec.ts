@@ -138,7 +138,7 @@ test.describe('WAF settings', () => {
     await page.goto('/waf');
     await page.getByRole('button', { name: 'Add exclusion' }).click();
     const dialog = page.getByRole('dialog', { name: 'Add exclusion' });
-    await dialog.getByLabel('Rule id').fill('920350');
+    await dialog.getByLabel('Rule', { exact: true }).fill('920350');
     await dialog.getByRole('textbox', { name: /^Path/ }).fill('/e2e-exclusion/');
     await dialog.getByLabel('Reason').fill('Playwright exclusion');
     await dialog.getByRole('button', { name: 'Add exclusion' }).click();
@@ -155,7 +155,7 @@ test.describe('WAF settings', () => {
     await page.goto('/waf');
     await page.getByRole('button', { name: 'Add exclusion' }).click();
     const dialog = page.getByRole('dialog', { name: 'Add exclusion' });
-    await dialog.getByLabel('Rule id').fill('949110');
+    await dialog.getByLabel('Rule', { exact: true }).fill('949110');
     await dialog.getByLabel('Reason').fill('Should not be possible');
     await dialog.getByRole('button', { name: 'Add exclusion' }).click();
     await expect(dialog.getByRole('alert')).toContainText('decides whether a request is blocked');

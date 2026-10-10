@@ -9,6 +9,7 @@ Pull the new images and recreate the containers with `docker compose pull && doc
 - **Choosing hosts by typing**: the WAF exclusion form and the alert rule editor search names and domains.
 - Analytics questions can ask about the last N minutes. AI providers that reason (OpenAI-compatible) get room to answer (4096 output tokens).
 - **Dismiss on an open alert dismisses it at once** (until it resolves); dismissing for a while and muting the rule are in the menu next to it.
+- **The web container exits when start-up fails** (a rejected `ADMIN_PASSWORD` or `SESSION_SECRET`, a failed migration) instead of answering every request with 500. Docker restarts it; `docker compose logs web` says why.
 
 ## Upgrading to v2.3.0
 

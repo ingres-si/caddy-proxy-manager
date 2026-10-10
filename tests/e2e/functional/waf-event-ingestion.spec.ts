@@ -114,10 +114,10 @@ test.describe.serial('WAF event ingestion', () => {
     const row = page.getByRole('row').filter({ hasText: '/ingest-blocked' }).filter({ has: page.getByRole('button', { expanded: false }) }).first();
     await expect(row).toBeVisible({ timeout: 20_000 });
     await row.getByRole('button', { expanded: false }).click();
-    await expect(page.getByRole('heading', { level: 3, name: 'Why it was blocked' })).toBeVisible();
-    await expect(page.getByText(/anomaly score, the limit is/)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole('button', { name: /^This was a false positive/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Block .*Blocked sources/ })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Why it was blocked' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/points, blocked at/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: /^Exclude (rule \d+|\d+ rules)…$/ })).toBeVisible();
+    await expect(page.getByTitle(/Blocked sources/)).toBeVisible();
   });
 
   test('ordinary traffic does not produce WAF events', async ({ page }) => {

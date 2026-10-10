@@ -52,6 +52,8 @@ test.describe('Dismissing an alert', () => {
     const ruleName = `Dismiss test ${stamp}`;
     const { certificatePem, privateKeyPem } = createSelfSignedServerCertificate(domain, [domain], 2);
     const created: string[] = [];
+    // The Alerts page adds the built-in rules on a fresh stack; added after ours, the certificate one would be left out.
+    await page.goto('/alerts');
     const rules = (await (await page.request.get(`${API}/alert-rules`)).json()) as { id: number; builtIn: string | null; enabled: boolean }[];
     const builtIn = rules.find((entry) => entry.builtIn === 'certificates');
 
@@ -104,7 +106,7 @@ test.describe('Dismissing an alert', () => {
       // Dismiss dismisses: until it resolves, at once, no dialog.
       await page.goto('/alerts');
       const card = page.getByRole('article').filter({ hasText: ruleName });
-      await card.getByRole('button', { name: `Dismiss ${alert.title}` }).click();
+      await card.getByRole('button', { name: `Dismiss ${alert.title}`, exact: true }).click();
       await expect(page.getByRole('dialog')).toHaveCount(0);
 
       const marker = card.getByTestId('silence-marker');
@@ -114,7 +116,8 @@ test.describe('Dismissing an alert', () => {
       if (dismissed.dismissal!.createdByName) await expect(marker).toContainText(`Dismissed · ${dismissed.dismissal!.createdByName}`);
 
       await page.goto('/');
-      await expect(page.getByRole('region', { name: 'Needs attention' })).toBeVisible();
+      // On a fresh install the section is left out once nothing in it needs attention.
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
       await expect(attentionItems(page, alert.title)).toHaveCount(0);
       expect(await sidebarCount(page)).toBe(before - 1);
 
