@@ -2,6 +2,11 @@
 
 Pull the new images and recreate the containers with `docker compose pull && docker compose up -d`. (`docker compose restart` does not re-read `.env`.)
 
+## Upgrading to v2.4.1
+
+- **Alert channel and AI provider URLs may not point at a link-local address or at Caddy's admin API**: saving one is refused, and delivery to a channel stored earlier at such an address fails with "The endpoint is …, which is not allowed" instead of sending. Link-local (`169.254.0.0/16`, `fe80::/10`) is where cloud metadata services answer; private LAN addresses stay allowed.
+- **E-mail addresses need a domain of non-empty labels** (the ACME e-mail, an e-mail channel's sender): `user@example..com` and `user@.example.com` are rejected.
+
 ## Upgrading to v2.4.0
 
 - **A host's Security tab manages its rule exclusions in place**: add (finding the rule by id or name), change and remove them there, also those limited to a path or variable; the rules that matched the host in the last 7 days are listed with **Exclude…**. The rarely changed WAF settings (global settings, Core Rule Set, body limits, custom directives) are under **Advanced**. Rate limiting reads *Global limits*, *Global and this host's*, *This host's only*.
